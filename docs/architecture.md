@@ -1,9 +1,9 @@
 # Архитектура unidocs — универсальный просмотрщик/редактор документов для Android
 
-Версия: 0.2 (проектная, после обзора OSS). Дата: 25.10.2026.
+Версия: 0.3 (проектная, после двух обзоров OSS). Дата: 25.10.2026.
 Цель: **минимальное по размеру, но максимально функциональное приложение**: офисные документы (просмотр; простое редактирование), Markdown (просмотр + редактирование), электронные книги (чтение), PDF (просмотр + заполнение форм, факсимиле).
 
-Сопутствующие документы: `docs/research/apk-leaders.md` (реверс двух лидеров), `docs/research/oss-survey.md` (проверенный обзор библиотек: версии, лицензии, замеры).
+Сопутствующие документы: `docs/research/apk-leaders.md` (реверс двух лидеров), `docs/research/oss-survey.md` (проверенный обзор библиотек: версии, лицензии, замеры), `docs/research/oss-apps-office-md.md` (референсы-приложения и web-компоненты: офис и Markdown).
 
 ---
 
@@ -41,8 +41,10 @@
                      [динамич.] :lib:pdf-forms (PDFBox-Android)
 :feature:books     → :core:webview + foliate-js (MIT): epub/mobi/azw3/fb2/cbz
                      [нативный fallback] epub4j для парсинга без WebView
-:feature:office    → :core:webview + docx-preview/SheetJS/PPTXjs (просмотр),
-                     [динамич.] :lib:office-edit (POI: правка данных xlsx/docx)
+:feature:office    → :core:webview + docx-preview/SheetJS/PPTXjs (просмотр; JS ~1–2 МБ),
+                     [динамич.] :lib:office-edit (POI: правка данных xlsx/docx),
+                     [динамич., кандидат] :lib:office-native (OpenDocument.core, MPL-2.0:
+                     C++→HTML, ~9 МБ/ABI, edit+save OOXML/ODF)
 ```
 
 Динамическая доставка: `:lib:pdf-forms` и `:lib:office-edit` — on-demand (+12 и +7 МБ соответственно); всё остальное — в базовом APK.
@@ -81,8 +83,8 @@ interface DocumentSession {
 
 - Парсер: `commonmark-java` (BSD-2, 0,20 МБ) + расширения (таблицы, зачёркивание, списки задач).
 - Рендер: **собственный** — Compose `AnnotatedString`/TextView spans (подсветка кода, изображения). Причина: Markwon удобен, но без релизов с 2021 (заморожен) — брать можно, строить на нём ядро нельзя.
-- Редактор: `BasicTextField` + тулбар (ж/к/заголовки/списки/ссылка), split-режим «текст | превью», моноширинный системный шрифт (опц. JetBrains Mono, 0,3 МБ). **sora-editor отвергнут — LGPL-2.1** (см. §11).
-- Mermaid — v2, отдельный опциональный WebView-модуль (у ReadMD он тянет 3 МБ ассетов).
+- Редактор: `BasicTextField` + тулбар (ж/к/заголовки/списки/ссылка), split-режим «текст | превью», моноширинный системный шрифт (опц. JetBrains Mono, 0,3 МБ). **sora-editor отвергнут — LGPL-2.1** (см. §11). Референсы: Markor (Apache-2.0) — 11,4 МБ APK целиком на нативном подходе; Joplin (144 МБ, AGPL, RN+WebView) — антипаттерн по весу.
+- Mermaid — v2, отдельный опциональный WebView-модуль (у ReadMD — 3 МБ, у Markor — 2,54 МБ из 11,4 МБ APK: подтверждение, что в базу его бандлить нельзя).
 
 ## 7. Домен: книги (epub/fb2/mobi/azw3/cbz/cbr)
 
@@ -94,11 +96,12 @@ interface DocumentSession {
 
 ## 8. Домен: офисные форматы (view-first)
 
-Проверено обзором: **лёгкого нативного OSS-рендерера OOXML не существует** — между «POI без вёрстки» и «LibreOffice на 74 МБ» пусто. Поэтому:
+Три реальных пути (проверены двумя обзорами): JS-конвертеры в WebView, LibreOfficeKit (~84–243 МБ) и посередине — `OpenDocument.core` (MPL-2.0, C++→HTML, 8,56 МБ на arm64, edit+save для OOXML/ODF):
 
-- **Просмотр (база)**: WebView + JS-конвертеры, подход доказан приложением **gander** (MIT, ~5 МБ, без натива): `docx-preview` (DOCX), **SheetJS** (XLSX, Apache-2.0), `PPTXjs` (MIT), ODT — свой XML→HTML. Вёрстка приблизительная, но вес базового офиса ~2–5 МБ.
+- **Просмотр (база)**: WebView + JS-конвертеры, подход доказан приложением **gander** (MIT, ~5 МБ, без натива): `docx-preview` 0.4.1 — **Apache-2.0, 74 КиБ** (лицензия подтверждена — открытый вопрос закрыт), **SheetJS** (XLSX, Apache-2.0, 861 КиБ min), `PPTXjs` (MIT), ODT — свой XML→HTML. Весь JS-набор офис-просмотра ~1–2 МБ, вёрстка приблизительная.
 - **Правка данных (динамический модуль)**: Apache POI (`poi-ooxml` + `xmlbeans`, 6,9 МБ jars, на Android через `poi-on-android`) — значения ячеек xlsx, текст docx на уровне ранов. Обещать «как в Word» нельзя и не обещаем.
-- **Настоящее офисное редактирование — только LibreOfficeKit** (`liblo-native-code.so`, тайловый рендер GL): по замеру F-Droid полный LibreOffice Viewer — **74 МБ** (не «сотни», как я предполагал до замера), редактирование поддержано. Но: NDK-сборка на часы, ARM-only, и лицензионный конфликт — файлы под MPL-2.0, а корневой `COPYING` репозитория — GPL-3.0; для закрытого форка это блокер до аудита. Решение отложено до явного запроса продукта.
+- **Настоящее офисное редактирование — LibreOfficeKit** (`liblo-native-code.so`, тайловый рендер GL): актуальный LibreOffice Viewer 26.2.6.3 — **83,6 МБ**, edit объявлен F-Droid экспериментальным; полноценный редактор — Collabora Office (исходники открыты, MPL-2.0, монорепо `online`) — **242,6 МБ на arm64**. Нюансы: NDK-сборка на часы и лицензионный конфликт LibreOffice (файлы MPL-2.0, корневой `COPYING` — GPL-3.0) — блокер до аудита. Решение отложено до явного запроса продукта.
+- **Средний путь — `OpenDocument.core`** (MPL-2.0, движок OpenDocument Reader): C++-конвертер → HTML → WebView, **8,56 МБ `.so` на arm64**, заявлены edit+save для odt/ods/odp/docx/pptx/xlsx. Кандидат на динамический модуль `:lib:office-native` после: (а) MPL-решения, (б) спайка по качеству edit+save на реальных файлах, (в) проверки, что GPL-компоненты той же организации (`pdf2htmlEX-Android`, `wvWare-Android`) не линкуются в ядро.
 - **Legacy .doc/.xls**: POI HWPF/HSSF — текст/таблицы без вёрстки; лёгкого рендерера не существует (честно фиксируем деградацию).
 
 ## 9. Файлы и хранилище
@@ -111,10 +114,11 @@ interface DocumentSession {
 
 | Часть | Оценка | Комментарий |
 |---|---|---|
-| base: шелл + MD + книги (foliate-js) + офис-просмотр (JS-конвертеры) + androidx.pdf | **12–18 МБ** | dex + JS-assets ~2–5 МБ; шрифты Noto Sans Regular+Bold ≈1,1 МБ; CJK не бандлить (системный fallback) |
+| base: шелл + MD + книги (foliate-js) + офис-просмотр (JS ~1–2 МБ) + androidx.pdf | **12–18 МБ** | шрифты Noto Sans Regular+Bold ≈1,1 МБ; CJK не бандлить (системный fallback) |
 | [динамич.] `:lib:pdf-forms` (PDFBox + BouncyCastle) | +12 МБ | формы + факсимиле + запись PDF |
 | [динамич.] pdfium-режим (`io.legere`) | +5 МБ/ABI | только arm64 в 99% устройств |
 | [динамич.] `:lib:office-edit` (POI) | +7 МБ | правка данных xlsx/docx |
+| [динамич., кандидат] `:lib:office-native` (OpenDocument.core) | +9 МБ/ABI | edit+save OOXML/ODF; требует MPL-решения и спайка |
 | **Итого: базовая установка ~15 МБ; всё включено ~40 МБ** | | против 273 МБ у NCloud Office и 74 МБ у LibreOffice Viewer |
 
 Механика сдерживания: R8 full + resource shrinking, App Bundle с ABI-сплитами, динамические модули, никакого Firebase/аналитики, baseline profiles.
@@ -125,12 +129,16 @@ interface DocumentSession {
 |---|---|---|
 | androidx.pdf, PDFBox-Android, POI, SheetJS, epub4j | Apache-2.0 | да |
 | commonmark-java, flexmark | BSD-2 | да |
-| docx-preview, PPTXjs, foliate-js, gander (референс) | MIT (docx-preview — проверить LICENSE в репо при подключении) | да |
+| docx-preview (Apache-2.0 — подтверждено), PPTXjs, foliate-js, mammoth, marked, markdown-it, gander (референс) | MIT / Apache-2.0 / BSD-2 | да |
 | pdf.js | Apache-2.0 | опция точной вёрстки |
 | io.legere:pdfiumandroid | Apache-2.0 (POM; в репо NOASSERTION — зафиксировать в NOTICE) | да |
 | Noto Sans | OFL-1.1 | да, в THIRD-PARTY |
 | junrar | UnRAR freeware (не OSI) | да, отдельный NOTICE, только распаковка |
 | Markwon | Apache-2.0 | опционально (заморожен) |
+| OpenDocument.core (ODR) | MPL-2.0 | вне allowlist v1; кандидат в динамический модуль после MPL-решения |
+| SuperDoc, OnlyOffice DocumentServer/x2t | AGPL-3.0 | нет |
+| Handsontable | проприетарная (free — только non-commercial) | нет |
+| Toast UI Editor, Luckysheet | MIT, но архивированы | нет (нет поддержки) |
 | sora-editor | **LGPL-2.1** | **нет** в v1 |
 | MuPDF | **AGPL-3.0** | **нет** (коммерческая лицензия или открытие всего продукта) |
 | DjVuLibre, Orion Viewer, CoolReader | **GPL-2.0/3.0** | **нет** в v1 |
@@ -156,6 +164,10 @@ interface DocumentSession {
 1. `androidx.pdf` beta на реальных PDF (сканы, CJK, формы) на API 26/31/35 — качество системного рендера и наличие выделения текста на старых прошивках. Решает судьбу pdfium-модуля.
 2. Вёрстка docx-preview/SheetJS против Word на реальных документах — главный риск WebView-подхода к офису (эталон для сравнения — сборка gander).
 3. foliate-js на больших EPUB (100+ МБ) и MOBI без DRM — память и скорость WebView на устройстве с 2 ГБ RAM.
-4. docx-preview LICENSE-файл и точная лицензия — подтвердить при подключении (обзор: «не проверено»).
+4. ~~docx-preview LICENSE~~ — закрыто: Apache-2.0, 0.4.1, min-сборка 74 КиБ.
 5. POI на Android (`poi-on-android`) — вес dex после R8 и время старта; если плохо — правка данных только для xlsx.
 6. DjVu — отдельное продуктовое решение (GPL-издание vs отсутствие формата), не техническое.
+7. MPL-политика: допустим ли MPL-2.0 в динамическом модуле; если да — `OpenDocument.core` становится главным кандидатом на «офисное редактирование без 243 МБ».
+8. Спайк ODR core: сборка arm64, замер stripped `.so`, качество edit+save на 10–15 реальных docx/xlsx/pptx, проверка линковки GPL-компонент (`pdf2htmlEX`, `wvWare`).
+9. Univer (Apache-2.0, активный) как редактор таблиц в динамическом модуле: собрать Vite-бандл и замерить min+gzip (оценка 5–10 МБ).
+10. MD-редактор: `BasicTextField` vs CodeMirror 6 в WebView на 1 МБ текста (память/ввод/undo) — если нативный проходит, WebView не тащим.
