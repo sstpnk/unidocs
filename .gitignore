@@ -7,6 +7,10 @@ _scratch/
 # APK-вложения не фиксируем нигде
 *.apk
 
+# Подпись релиза — вне git
+signing/
+*.jks
+
 # Android / Gradle
 .gradle/
 build/

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">unidocs</string>
+    <string name="open_document">Open document</string>
+    <string name="recents_title">Recent</string>
+    <string name="empty_recents">Nothing opened yet.\nTap “Open document” to pick a file.</string>
+</resources>
