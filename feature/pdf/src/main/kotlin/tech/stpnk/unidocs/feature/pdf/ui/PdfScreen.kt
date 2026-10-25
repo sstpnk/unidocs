@@ -14,6 +14,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -36,7 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.pdf.view.PdfView
 import tech.stpnk.unidocs.feature.pdf.PdfSession
-import tech.stpnk.unidocs.feature.pdf.engine.PdfRendererEngine
+import tech.stpnk.unidocs.feature.pdfedit.engine.PdfRendererEngine
+import tech.stpnk.unidocs.feature.pdfedit.ui.PdfEditScreen
 
 /**
  * Экран PDF: основной движок — androidx.pdf PdfView (поиск, выделение, ссылки),
@@ -47,6 +49,7 @@ import tech.stpnk.unidocs.feature.pdf.engine.PdfRendererEngine
 @Composable
 fun PdfScreen(session: PdfSession, onBack: () -> Unit) {
     var fallback by rememberSaveable { mutableStateOf(false) }
+    var editing by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -67,6 +70,7 @@ fun PdfScreen(session: PdfSession, onBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    TextButton(onClick = { editing = true }) { Text("✎ Редактировать") }
                     FilterChip(
                         selected = fallback,
                         onClick = { fallback = !fallback },
@@ -77,6 +81,10 @@ fun PdfScreen(session: PdfSession, onBack: () -> Unit) {
             )
         },
     ) { padding ->
+        if (editing) {
+            PdfEditScreen(uriString = session.uriString, onClose = { editing = false })
+            return@Scaffold
+        }
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (fallback) {
                 FallbackPdfView(session)

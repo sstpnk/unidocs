@@ -34,6 +34,7 @@ kotlin {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:ui"))
+    implementation(project(":feature:pdf-edit"))
 
     // Основной движок: androidx.pdf (PdfView + sandbox-сервис + pdf-core)
     api(libs.androidx.pdf.viewer)

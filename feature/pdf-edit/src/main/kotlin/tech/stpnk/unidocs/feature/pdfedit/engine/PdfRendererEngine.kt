@@ -1,4 +1,4 @@
-package tech.stpnk.unidocs.feature.pdf.engine
+package tech.stpnk.unidocs.feature.pdfedit.engine
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -11,7 +11,8 @@ import java.io.IOException
 
 /**
  * Fallback-движок на системном PdfRenderer: без зависимостей, рендер по запросу.
- * Используется как запасной экран и для сравнения качества с androidx.pdf.
+ * Используется fallback-просмотрщиком PDF и предпросмотром страницы
+ * при позиционировании факсимиле.
  */
 class PdfRendererEngine(context: Context, uri: Uri) : AutoCloseable {
 
