@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:storage"))
     implementation(project(":core:ui"))
+    implementation(project(":feature:markdown"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

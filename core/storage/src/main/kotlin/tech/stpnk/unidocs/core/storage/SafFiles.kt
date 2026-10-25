@@ -54,4 +54,25 @@ object SafFiles {
         }
         return bytes ?: ByteArray(0)
     }
+
+    /**
+     * Полное чтение документа (по умолчанию не больше 32 МБ —
+     * защита от случайного открытия гигантского файла).
+     */
+    fun readAll(context: Context, uri: Uri, maxBytes: Long = 32L * 1024 * 1024): ByteArray {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+            val out = java.io.ByteArrayOutputStream()
+            val chunk = ByteArray(64 * 1024)
+            var total = 0L
+            while (true) {
+                val read = input.read(chunk)
+                if (read <= 0) break
+                total += read
+                check(total <= maxBytes) { "Файл больше ${maxBytes / (1024 * 1024)} МБ" }
+                out.write(chunk, 0, read)
+            }
+            out.toByteArray()
+        }
+        return bytes ?: ByteArray(0)
+    }
 }
