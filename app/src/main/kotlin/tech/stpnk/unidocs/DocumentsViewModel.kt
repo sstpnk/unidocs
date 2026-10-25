@@ -23,6 +23,7 @@ import tech.stpnk.unidocs.core.storage.RecentsStore
 import tech.stpnk.unidocs.core.storage.SafFiles
 import tech.stpnk.unidocs.feature.books.BookPlugin
 import tech.stpnk.unidocs.feature.markdown.MarkdownPlugin
+import tech.stpnk.unidocs.feature.office.OfficePlugin
 import tech.stpnk.unidocs.feature.pdf.PdfPlugin
 
 /**
@@ -38,6 +39,7 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
         listOf(
             PdfPlugin(application),
             BookPlugin(application),
+            OfficePlugin(application),
             MarkdownPlugin(application),
         ),
     )

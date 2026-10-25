@@ -44,6 +44,8 @@ import tech.stpnk.unidocs.core.ui.theme.UnidocsTheme
 import tech.stpnk.unidocs.feature.books.BookSession
 import tech.stpnk.unidocs.feature.books.ui.BookScreen
 import tech.stpnk.unidocs.feature.markdown.MarkdownSession
+import tech.stpnk.unidocs.feature.office.OfficeSession
+import tech.stpnk.unidocs.feature.office.ui.OfficeScreen
 import tech.stpnk.unidocs.feature.markdown.ui.MarkdownScreen
 import tech.stpnk.unidocs.feature.pdf.PdfSession
 import tech.stpnk.unidocs.feature.pdf.ui.PdfScreen
@@ -72,6 +74,10 @@ class MainActivity : ComponentActivity() {
                         onBack = viewModel::closeSession,
                     )
                     current is BookSession -> BookScreen(
+                        session = current,
+                        onBack = viewModel::closeSession,
+                    )
+                    current is OfficeSession -> OfficeScreen(
                         session = current,
                         onBack = viewModel::closeSession,
                     )

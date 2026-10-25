@@ -13,6 +13,7 @@ androidxPdf = "1.0.0-beta01"
 pdfboxAndroid = "2.0.27.0"
 androidxWebkit = "1.18.0"
 junrar = "7.5.5"
+kxml2 = "2.3.0"
 junit = "4.13.2"
 
 [libraries]
@@ -35,6 +36,7 @@ androidx-pdf-document-service = { group = "androidx.pdf", name = "pdf-document-s
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "androidxWebkit" }
 junrar = { group = "com.github.junrar", name = "junrar", version.ref = "junrar" }
+kxml2 = { group = "net.sf.kxml", name = "kxml2", version.ref = "kxml2" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

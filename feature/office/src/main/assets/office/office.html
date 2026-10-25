@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Документ</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #e9e9e9; }
+  body { font-family: system-ui, sans-serif; }
+  #sheetbar { position: sticky; top: 0; z-index: 20; overflow-x: auto; white-space: nowrap; background: #217346; display: none; }
+  .sheetbtn { display: inline-block; padding: 8px 14px; color: #fff; cursor: pointer; font-size: 13px; }
+  .sheetbtn.active { background: #fff; color: #217346; font-weight: 600; }
+  .docpage { background: #fff; margin: 12px auto; max-width: 900px; box-shadow: 0 1px 5px rgba(0,0,0,.28); overflow-x: auto; }
+  .docpage table { border-collapse: collapse; }
+  .err { color: #b00020; padding: 16px; font-size: 14px; }
+  #content { padding-bottom: 24px; }
+</style>
+<script src="./vendor/jquery.min.js"></script>
+<script src="./vendor/jszip2.min.js"></script>
+<script src="./vendor/filereader.js"></script>
+<script src="./vendor/d3.min.js"></script>
+<script src="./vendor/nv.d3.min.js"></script>
+<script src="./vendor/divs2slides.min.js"></script>
+<script src="./vendor/pptxjs.min.js"></script>
+<script src="./vendor/jquery.fullscreen.min.js"></script>
+<script src="./vendor/docx-preview.min.js"></script>
+<script src="./vendor/xlsx.full.min.js"></script>
+</head>
+<body>
+<div id="sheetbar"></div>
+<div id="content"></div>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var type = (params.get('type') || '').toLowerCase();
+  var src = params.get('src') || '';
+  var bridge = window.AndroidBridge;
+  var content = document.getElementById('content');
+
+  function showError(message) {
+    content.innerHTML = '<div class="err">' + message + '</div>';
+    if (bridge) bridge.onError(String(message));
+  }
+
+  function done() {
+    if (bridge) bridge.onRendered();
+  }
+
+  var renderers = {
+    docx: async function () {
+      var buffer = await (await fetch(src)).arrayBuffer();
+      await docx.renderAsync(buffer, content, null, { inWrapper: true });
+      done();
+    },
+    xlsx: async function () {
+      var buffer = new Uint8Array(await (await fetch(src)).arrayBuffer());
+      var workbook = XLSX.read(buffer, { type: 'array' });
+      var bar = document.getElementById('sheetbar');
+      bar.style.display = 'block';
+      workbook.SheetNames.forEach(function (name, index) {
+        var button = document.createElement('span');
+        button.className = 'sheetbtn' + (index === 0 ? ' active' : '');
+        button.textContent = name;
+        button.onclick = function () {
+          Array.prototype.forEach.call(bar.children, function (child) { child.classList.remove('active'); });
+          button.classList.add('active');
+          Array.prototype.forEach.call(content.children, function (child, childIndex) {
+            child.style.display = childIndex === index ? 'block' : 'none';
+          });
+        };
+        bar.appendChild(button);
+
+        var sheetPage = document.createElement('div');
+        sheetPage.className = 'docpage';
+        sheetPage.style.display = index === 0 ? 'block' : 'none';
+        sheetPage.innerHTML = XLSX.utils.sheet_to_html(workbook.Sheets[name], { editable: false });
+        content.appendChild(sheetPage);
+      });
+      done();
+    },
+    pptx: async function () {
+      $('#content').pptxToHtml({ pptxFileUrl: src });
+      done();
+    },
+    odt: async function () {
+      var html = await (await fetch(src)).text();
+      content.innerHTML = html;
+      done();
+    }
+  };
+
+  window.addEventListener('load', function () {
+    if (bridge) bridge.onPageReady();
+    var render = renderers[type];
+    if (!render) {
+      showError('Формат пока не поддерживается: ' + type);
+      return;
+    }
+    Promise.resolve()
+      .then(render)
+      .catch(function (e) { showError('Не удалось отобразить документ: ' + (e && e.message ? e.message : e)); });
+  });
+})();
+</script>
+</body>
+</html>

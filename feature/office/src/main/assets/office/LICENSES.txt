@@ -1,0 +1,31 @@
+Лицензии JS-движков офисного просмотра (assets/office/vendor)
+=============================================================
+
+Этот код поставляется пользователю вместе с приложением (требование лицензий).
+
+- docx-preview (docxjs) 0.4.1 — Apache License 2.0
+  https://github.com/VolodymyrBaydalka/docxjs
+
+- SheetJS (xlsx.full.min.js) 0.18.5 — Apache License 2.0
+  https://sheetjs.com
+
+- PPTXjs (pptxjs.min.js, divs2slides.min.js, pptxjs.css) — MIT License
+  https://github.com/meshesha/PPTXjs
+
+- jQuery 1.11.3 — MIT License
+  https://jquery.com
+
+- JSZip 2.x — MIT License (GPLv3-совместимо)
+  https://stuk.github.io/jszip
+
+- filereader.js — MIT License
+  https://github.com/bgrins/filereader.js
+
+- D3.js — BSD-3-Clause
+  https://d3js.org
+
+- NVD3 — Apache License 2.0
+  http://nvd3.org
+
+- jquery.fullscreen — MIT License
+  https://github.com/kayahr/jquery-fullscreen-plugin
