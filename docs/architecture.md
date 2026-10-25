@@ -19,7 +19,7 @@
 
 ## 2. Язык и стек — почему Kotlin
 
-**Решение: Kotlin + Jetpack Compose (Material 3), single-activity.** Аргументы:
+**Решение: Kotlin + Jetpack Compose (Material 3), single-activity; неймспейс и applicationId — `tech.stpnk.unidocs` (конвенция Сергея: все его проекты — `tech.stpnk.*`).** Аргументы:
 
 - Вся нужная нативная экосистема — JVM/Android-first: `androidx.pdf`, pdfium-биндинги, PDFBox-Android (формы), commonmark, epub4j.
 - Compose даёт наименьший объём UI-кода и удобный хостинг «чужих» поверхностей (AndroidView/WebView) для движков, которые рендерят HTML.
@@ -148,7 +148,7 @@ interface DocumentSession {
 
 ## 12. Дорожная карта
 
-- **M0. Каркас**: плагинный SPI, `:core:webview` (изоляция), файловый менеджер (SAF), бюджет размера в CI.
+- **M0. Каркас** — ✅ выполнен 25.10.2026: Gradle-скелет (модули `:app`, `:core:model`, `:core:storage`, `:core:ui`; Kotlin 2.0.21, AGP 8.7.3, Gradle 8.10.2, Compose BOM 2024.12.01), плагинный SPI с юнит-тестами, SAF-менеджер + «Недавние» (DataStore), CI (сборка + тесты + гейт размера 25 МБ). Замеры: debug 9,3 МБ, release (R8) 1,0 МБ. `:core:webview` перенесён в M4 — к первому использованию.
 - **M1. Markdown**: просмотр + split-редактор (commonmark + собственный рендер).
 - **M2. PDF-просмотр**: androidx.pdf + fallback PdfRenderer; бенчмарк на сканах/CJK/формах (см. §13).
 - **M3. PDF-редактирование**: динамический модуль PDFBox — AcroForm, факсимиле, сохранение.

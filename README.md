@@ -20,7 +20,21 @@
 
 ## Статус
 
-Фаза исследований и проектирования. Код ещё не начат; вехи M0–M7 описаны в архитектуре.
+- **M0 выполнен (25.10.2026)**: Gradle-каркас (Kotlin 2.0.21, AGP 8.7.3, Gradle 8.10.2, Compose BOM 2024.12.01), плагинный SPI с юнит-тестами, файловый менеджер на SAF, «Недавние» на DataStore, CI с гейтом размера.
+- Размеры: debug **9,3 МБ**, release (R8) **1,0 МБ** — бюджет base-APK 25 МБ выдержан с большим запасом.
+- Дальше: **M1 — Markdown** (просмотр + split-редактор на commonmark). Полный план вех — в [архитектуре](docs/architecture.md).
+
+## Сборка
+
+Нужны JDK 17 и Android SDK (platforms;android-35).
+
+```bash
+./gradlew.bat :app:assembleDebug        # Windows
+./gradlew :app:assembleDebug            # Linux/macOS
+./gradlew.bat :core:model:testDebugUnitTest   # тесты SPI
+```
+
+CI (GitHub Actions) собирает debug-APK, гоняет тесты и проверяет бюджет размера на каждый push/PR.
 
 ## Репозиторий
 
