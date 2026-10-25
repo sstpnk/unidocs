@@ -1,0 +1,25 @@
+# Референсы и локальные инструменты — в git не попадают
+.ref_apks/
+tools/
+_scratch/
+.zwork/
+
+# APK-вложения не фиксируем нигде
+*.apk
+
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+*.keystore
+!debug.keystore
+
+# OS
+Thumbs.db
+.DS_Store
