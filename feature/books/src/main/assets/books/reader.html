@@ -93,6 +93,37 @@ window.reader = {
     prev() { view.prev() },
     setStyle(json) { style = Object.assign({}, style, JSON.parse(json)); applyStyle() },
     setFlow(flow) { try { view.renderer && view.renderer.setAttribute && view.renderer.setAttribute('flow', flow) } catch (e) { console.error(e) } },
+    search(query) {
+        (async () => {
+            try {
+                for await (const result of view.search({ query })) {
+                    if (result === 'done') {
+                        bridge && bridge.onSearch(JSON.stringify({ done: true }))
+                    } else if (result.progress != null) {
+                        bridge && bridge.onSearch(JSON.stringify({ progress: result.progress }))
+                    } else if (result.subitems) {
+                        bridge && bridge.onSearch(JSON.stringify({
+                            label: result.label || '',
+                            subitems: (result.subitems || []).map(function (s) {
+                                return { cfi: s.cfi, pre: s.excerpt.pre, match: s.excerpt.match, post: s.excerpt.post }
+                            })
+                        }))
+                    } else if (result.cfi) {
+                        bridge && bridge.onSearch(JSON.stringify({
+                            cfi: result.cfi,
+                            pre: result.excerpt.pre,
+                            match: result.excerpt.match,
+                            post: result.excerpt.post
+                        }))
+                    }
+                }
+            } catch (e) {
+                bridge && bridge.onSearch(JSON.stringify({ error: String((e && e.message) || e) }))
+            }
+        })()
+    },
+    clearSearch() { try { view.clearSearch() } catch (e) { console.error(e) } },
+    goToCfi(cfi) { const p = view.goTo('foliate-search:' + cfi); if (p && p.catch) p.catch(function () {}) },
 }
 
 bridge && bridge.onPageReady()

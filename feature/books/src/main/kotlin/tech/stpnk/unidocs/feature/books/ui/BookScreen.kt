@@ -26,9 +26,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -49,7 +52,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.webkit.WebViewAssetLoader
 import kotlinx.coroutines.Job
@@ -62,6 +69,8 @@ import tech.stpnk.unidocs.core.webview.IsolatedWebView
 import tech.stpnk.unidocs.feature.books.BookBridge
 import tech.stpnk.unidocs.feature.books.BookSession
 import tech.stpnk.unidocs.feature.books.ReadingPosition
+import tech.stpnk.unidocs.feature.books.SearchEvent
+import tech.stpnk.unidocs.feature.books.SearchItem
 import tech.stpnk.unidocs.feature.books.TocEntry
 import java.io.File
 import java.io.InputStream
@@ -104,6 +113,12 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
     var settingsOpen by remember { mutableStateOf(false) }
     var tocOpen by remember { mutableStateOf(false) }
     var bookmarksOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchRunning by remember { mutableStateOf(false) }
+    var searchProgress by remember { mutableStateOf(0.0) }
+    var searchResults by remember { mutableStateOf<List<SearchItem>>(emptyList()) }
+    var searchSection by remember { mutableStateOf("") }
 
     var tocEntries by remember { mutableStateOf<List<TocEntry>>(emptyList()) }
     val bookmarks by session.store.bookmarks(session.sourceUri).collectAsState(initial = emptyList())
@@ -181,6 +196,33 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                 }
             }
 
+            override fun onSearch(event: SearchEvent) {
+                main.post {
+                    when {
+                        event.error != null -> {
+                            searchRunning = false
+                            report("Ошибка поиска: ${event.error}")
+                        }
+
+                        event.done -> searchRunning = false
+
+                        event.progress != null -> searchProgress = event.progress
+
+                        event.subitems.isNotEmpty() -> {
+                            searchSection = event.label.orEmpty()
+                            searchResults = searchResults + event.subitems
+                        }
+
+                        event.cfi != null -> searchResults = searchResults + SearchItem(
+                            cfi = event.cfi,
+                            pre = event.pre.orEmpty(),
+                            match = event.match.orEmpty(),
+                            post = event.post.orEmpty(),
+                        )
+                    }
+                }
+            }
+
             override fun onError(message: String) {
                 report("Ошибка книги: $message")
             }
@@ -253,6 +295,9 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { searchOpen = true }) {
+                        Text("🔍", style = MaterialTheme.typography.titleLarge)
+                    }
                     IconButton(onClick = { tocOpen = true }) {
                         Text("☰", style = MaterialTheme.typography.titleLarge)
                     }
@@ -302,7 +347,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                         Text(if (bookmarkAtCurrent() != null) "★" else "☆", style = MaterialTheme.typography.titleLarge)
                     }
                     IconButton(onClick = { bookmarksOpen = true }) {
-                        Text("✎", style = MaterialTheme.typography.titleMedium)
+                        Text("🔖", style = MaterialTheme.typography.titleLarge)
                     }
                 },
             )
@@ -382,6 +427,105 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                 "reader.open('https://$ASSET_HOST/media/book.${session.format}')",
                 null,
             )
+        }
+    }
+
+    if (searchOpen) {
+        ModalBottomSheet(onDismissRequest = { searchOpen = false }) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Найти в книге") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(
+                        onClick = {
+                            if (searchQuery.isNotBlank()) {
+                                searchResults = emptyList()
+                                searchSection = ""
+                                searchRunning = true
+                                searchProgress = 0.0
+                                webView?.evaluateJavascript(
+                                    "reader.search(\"${escapeJs(searchQuery)}\")",
+                                    null,
+                                )
+                            }
+                        },
+                        enabled = !searchRunning && searchQuery.isNotBlank(),
+                    ) { Text("Найти") }
+                }
+
+                if (searchRunning) {
+                    LinearProgressIndicator(
+                        progress = { searchProgress.toFloat() },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Найдено: ${searchResults.size}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(
+                        onClick = {
+                            webView?.evaluateJavascript("reader.clearSearch()", null)
+                            searchResults = emptyList()
+                        },
+                        enabled = searchResults.isNotEmpty(),
+                    ) { Text("Сбросить подсветку") }
+                }
+
+                LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
+                    items(searchResults, key = { it.cfi + it.match.hashCode().toString() }) { item ->
+                        val excerpt = buildAnnotatedString {
+                            append(item.pre)
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) {
+                                append(item.match)
+                            }
+                            append(item.post)
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    searchOpen = false
+                                    webView?.evaluateJavascript(
+                                        "reader.goToCfi(\"${escapeJs(item.cfi)}\")",
+                                        null,
+                                    )
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Text(
+                                text = excerpt,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (searchSection.isNotEmpty()) {
+                                Text(
+                                    text = searchSection,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    }
+                }
+            }
         }
     }
 

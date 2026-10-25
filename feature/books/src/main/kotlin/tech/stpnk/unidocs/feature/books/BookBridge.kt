@@ -19,6 +19,27 @@ data class TocEntry(
     val level: Int = 0,
 )
 
+@Serializable
+data class SearchItem(
+    val cfi: String = "",
+    val pre: String = "",
+    val match: String = "",
+    val post: String = "",
+)
+
+@Serializable
+data class SearchEvent(
+    val done: Boolean = false,
+    val progress: Double? = null,
+    val error: String? = null,
+    val label: String? = null,
+    val subitems: List<SearchItem> = emptyList(),
+    val cfi: String? = null,
+    val pre: String? = null,
+    val match: String? = null,
+    val post: String? = null,
+)
+
 /**
  * JS-мост foliate-js → Kotlin. Методы вызываются на потоке WebView,
  * поэтому экран обязан перепрыгивать на main для изменения состояния.
@@ -30,6 +51,7 @@ class BookBridge(private val callbacks: Callbacks) {
         fun onLoaded()
         fun onRelocate(detail: RelocateDetail)
         fun onToc(entries: List<TocEntry>)
+        fun onSearch(event: SearchEvent)
         fun onError(message: String)
     }
 
@@ -52,6 +74,12 @@ class BookBridge(private val callbacks: Callbacks) {
     fun onToc(payload: String) {
         val entries = runCatching { json.decodeFromString<List<TocEntry>>(payload) }.getOrDefault(emptyList())
         callbacks.onToc(entries)
+    }
+
+    @JavascriptInterface
+    fun onSearch(payload: String) {
+        val event = runCatching { json.decodeFromString<SearchEvent>(payload) }.getOrNull() ?: return
+        callbacks.onSearch(event)
     }
 
     @JavascriptInterface
