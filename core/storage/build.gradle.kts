@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "tech.stpnk.unidocs.core.storage"
-    compileSdk = 35
+    compileSdk = 36
+
+    // androidx.pdf требует SDK extension 19 (библиотеки Android 16 QPR)
+    compileSdkExtension = 19
 
     defaultConfig {
         minSdk = 26

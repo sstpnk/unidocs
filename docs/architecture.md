@@ -114,12 +114,11 @@ interface DocumentSession {
 
 | Часть | Оценка | Комментарий |
 |---|---|---|
-| base: шелл + MD + книги (foliate-js) + офис-просмотр (JS ~1–2 МБ) + androidx.pdf | **12–18 МБ** | шрифты Noto Sans Regular+Bold ≈1,1 МБ; CJK не бандлить (системный fallback) |
+| base (факт M2): шелл + MD + PDF (androidx.pdf) | **4,7 МБ release** (debug 32,6 МБ) | R8 вычистил material/sandbox; книги/офис добавят ~2–5 МБ JS-assets |
 | [динамич.] `:lib:pdf-forms` (PDFBox + BouncyCastle) | +12 МБ | формы + факсимиле + запись PDF |
-| [динамич.] pdfium-режим (`io.legere`) | +5 МБ/ABI | только arm64 в 99% устройств |
 | [динамич.] `:lib:office-edit` (POI) | +7 МБ | правка данных xlsx/docx |
 | [динамич., кандидат] `:lib:office-native` (OpenDocument.core) | +9 МБ/ABI | edit+save OOXML/ODF; требует MPL-решения и спайка |
-| **Итого: базовая установка ~15 МБ; всё включено ~40 МБ** | | против 273 МБ у NCloud Office и 74 МБ у LibreOffice Viewer |
+| **Итого (факт M2): release ~5 МБ; с книгами/офисом прогноз ~8–12 МБ** | | против 273 МБ у NCloud Office и 83,6 МБ у LibreOffice Viewer |
 
 Механика сдерживания: R8 full + resource shrinking, App Bundle с ABI-сплитами, динамические модули, никакого Firebase/аналитики, baseline profiles.
 
@@ -148,9 +147,9 @@ interface DocumentSession {
 
 ## 12. Дорожная карта
 
-- **M0. Каркас** — ✅ выполнен 25.10.2026: Gradle-скелет (модули `:app`, `:core:model`, `:core:storage`, `:core:ui`; Kotlin 2.0.21, AGP 8.7.3, Gradle 8.10.2, Compose BOM 2024.12.01), плагинный SPI с юнит-тестами, SAF-менеджер + «Недавние» (DataStore), CI (сборка + тесты + гейт размера 25 МБ). Замеры: debug 9,3 МБ, release (R8) 1,0 МБ. `:core:webview` перенесён в M4 — к первому использованию.
+- **M0. Каркас** — ✅ выполнен 25.10.2026: Gradle-скелет (модули `:app`, `:core:model`, `:core:storage`, `:core:ui`), плагинный SPI с юнит-тестами, SAF-менеджер + «Недавние» (DataStore), CI (сборка + тесты + гейты размера).
 - **M1. Markdown** — ✅ выполнен 25.10.2026: модуль `:feature:markdown` — плагин SPI, парсер commonmark 0.24.0 (+GFM-таблицы/зачёркивание/списки задач) → собственная модель MdBlock/MdSpan (12 юнит-тестов), Compose-рендер без WebView, сессия с единым источником текста, поиск, оглавление, сохранение через SAF; экран «Текст / Сплит / Превью» с тулбаром разметки и защитой несохранённых правок. Размеры: debug 9,5 МБ, release (R8) 1,24 МБ.
-- **M2. PDF-просмотр**: androidx.pdf + fallback PdfRenderer; бенчмарк на сканах/CJK/формах (см. §13).
+- **M2. PDF-просмотр** — ✅ выполнен 25.10.2026: модуль `:feature:pdf` — androidx.pdf 1.0.0-beta01 (PdfView: выделение/ссылки/поиск UI; sandbox-сервис; session-поиск через searchDocument) + fallback-движок на системном PdfRenderer (переключатель в шапке). Потребовал обновления стека: Gradle 8.14.3, AGP 8.13.0, Kotlin 2.2.20, compileSdk 36 (+extension 19), minSdk 28 (требование pdf-core). Размеры: debug 32,6 МБ / release (R8) **4,7 МБ**. Качество рендера — бенчмарк на устройстве (§13).
 - **M3. PDF-редактирование**: динамический модуль PDFBox — AcroForm, факсимиле, сохранение.
 - **M4. Книги**: foliate-js (epub/fb2/mobi/azw3/cbz), темы, закладки, позиции; cbr через junrar.
 - **M5. Офис-просмотр**: docx-preview/SheetJS/PPTXjs в WebView; сравнение вёрстки с Word на 10–15 реальных документах.

@@ -6,11 +6,15 @@ plugins {
 
 android {
     namespace = "tech.stpnk.unidocs"
-    compileSdk = 35
+    compileSdk = 36
+
+    // androidx.pdf требует SDK extension 19 (библиотеки Android 16 QPR)
+    compileSdkExtension = 19
 
     defaultConfig {
         applicationId = "tech.stpnk.unidocs"
-        minSdk = 26
+        // androidx.pdf требует minSdk 28 (Android 9+, ~98% активных устройств)
+        minSdk = 28
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0-m0"
@@ -46,6 +50,7 @@ dependencies {
     implementation(project(":core:storage"))
     implementation(project(":core:ui"))
     implementation(project(":feature:markdown"))
+    implementation(project(":feature:pdf"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

@@ -1,6 +1,6 @@
 [versions]
-agp = "8.7.3"
-kotlin = "2.0.21"
+agp = "8.13.0"
+kotlin = "2.2.20"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
@@ -9,6 +9,7 @@ datastore = "1.1.7"
 coroutines = "1.7.3"
 serializationJson = "1.7.3"
 commonmark = "0.24.0"
+androidxPdf = "1.0.0-beta01"
 junit = "4.13.2"
 
 [libraries]
@@ -26,6 +27,8 @@ commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "com
 commonmark-ext-gfm-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-tables", version.ref = "commonmark" }
 commonmark-ext-gfm-strikethrough = { group = "org.commonmark", name = "commonmark-ext-gfm-strikethrough", version.ref = "commonmark" }
 commonmark-ext-task-list-items = { group = "org.commonmark", name = "commonmark-ext-task-list-items", version.ref = "commonmark" }
+androidx-pdf-viewer = { group = "androidx.pdf", name = "pdf-viewer", version.ref = "androidxPdf" }
+androidx-pdf-document-service = { group = "androidx.pdf", name = "pdf-document-service", version.ref = "androidxPdf" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

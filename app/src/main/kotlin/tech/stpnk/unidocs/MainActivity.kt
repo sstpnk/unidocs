@@ -43,6 +43,8 @@ import tech.stpnk.unidocs.core.storage.RecentDocument
 import tech.stpnk.unidocs.core.ui.theme.UnidocsTheme
 import tech.stpnk.unidocs.feature.markdown.MarkdownSession
 import tech.stpnk.unidocs.feature.markdown.ui.MarkdownScreen
+import tech.stpnk.unidocs.feature.pdf.PdfSession
+import tech.stpnk.unidocs.feature.pdf.ui.PdfScreen
 import java.text.DateFormat
 import java.util.Date
 
@@ -62,6 +64,10 @@ class MainActivity : ComponentActivity() {
                         session = current,
                         onBack = viewModel::closeSession,
                         onSave = viewModel::saveSession,
+                    )
+                    current is PdfSession -> PdfScreen(
+                        session = current,
+                        onBack = viewModel::closeSession,
                     )
                     else -> PlaceholderScreen(
                         title = current.info.title,

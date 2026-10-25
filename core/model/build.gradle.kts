@@ -1,11 +1,14 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "tech.stpnk.unidocs.core.model"
-    compileSdk = 35
+    compileSdk = 36
+
+    // androidx.pdf требует SDK extension 19 (библиотеки Android 16 QPR)
+    compileSdkExtension = 19
 
     defaultConfig {
         minSdk = 26

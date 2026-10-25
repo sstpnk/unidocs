@@ -22,6 +22,7 @@ import tech.stpnk.unidocs.core.storage.RecentDocument
 import tech.stpnk.unidocs.core.storage.RecentsStore
 import tech.stpnk.unidocs.core.storage.SafFiles
 import tech.stpnk.unidocs.feature.markdown.MarkdownPlugin
+import tech.stpnk.unidocs.feature.pdf.PdfPlugin
 
 /**
  * M1: файловый менеджер (SAF) + «Недавние» + открытие документов через плагины.
@@ -34,6 +35,7 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
     /** Порядок регистрации важен: более специфичные плагины — раньше. */
     private val registry = PluginRegistry(
         listOf(
+            PdfPlugin(application),
             MarkdownPlugin(application),
         ),
     )
