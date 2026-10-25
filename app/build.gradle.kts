@@ -51,6 +51,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":feature:markdown"))
     implementation(project(":feature:pdf"))
+    implementation(project(":feature:books"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

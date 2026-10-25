@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import tech.stpnk.unidocs.core.storage.RecentDocument
 import tech.stpnk.unidocs.core.ui.theme.UnidocsTheme
+import tech.stpnk.unidocs.feature.books.BookSession
+import tech.stpnk.unidocs.feature.books.ui.BookScreen
 import tech.stpnk.unidocs.feature.markdown.MarkdownSession
 import tech.stpnk.unidocs.feature.markdown.ui.MarkdownScreen
 import tech.stpnk.unidocs.feature.pdf.PdfSession
@@ -66,6 +68,10 @@ class MainActivity : ComponentActivity() {
                         onSave = viewModel::saveSession,
                     )
                     current is PdfSession -> PdfScreen(
+                        session = current,
+                        onBack = viewModel::closeSession,
+                    )
+                    current is BookSession -> BookScreen(
                         session = current,
                         onBack = viewModel::closeSession,
                     )

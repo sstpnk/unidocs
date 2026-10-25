@@ -11,6 +11,8 @@ serializationJson = "1.7.3"
 commonmark = "0.24.0"
 androidxPdf = "1.0.0-beta01"
 pdfboxAndroid = "2.0.27.0"
+androidxWebkit = "1.18.0"
+junrar = "7.5.5"
 junit = "4.13.2"
 
 [libraries]
@@ -31,6 +33,8 @@ commonmark-ext-task-list-items = { group = "org.commonmark", name = "commonmark-
 androidx-pdf-viewer = { group = "androidx.pdf", name = "pdf-viewer", version.ref = "androidxPdf" }
 androidx-pdf-document-service = { group = "androidx.pdf", name = "pdf-document-service", version.ref = "androidxPdf" }
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "androidxWebkit" }
+junrar = { group = "com.github.junrar", name = "junrar", version.ref = "junrar" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

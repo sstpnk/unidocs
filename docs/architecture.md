@@ -114,7 +114,7 @@ interface DocumentSession {
 
 | Часть | Оценка | Комментарий |
 |---|---|---|
-| base (факт M2): шелл + MD + PDF (androidx.pdf) | **4,7 МБ release** (debug 32,6 МБ) | R8 вычистил material/sandbox; книги/офис добавят ~2–5 МБ JS-assets |
+| base (факт M4): шелл + MD + PDF (просмотр+редактирование) + книги (foliate-js) | **7,3 МБ release** (debug 37,1 МБ) | R8 вычистил material/sandbox/BC; офис-просмотр добавит ~1–2 МБ JS |
 | [динамич.] `:lib:pdf-forms` (PDFBox + BouncyCastle) | +12 МБ | формы + факсимиле + запись PDF |
 | [динамич.] `:lib:office-edit` (POI) | +7 МБ | правка данных xlsx/docx |
 | [динамич., кандидат] `:lib:office-native` (OpenDocument.core) | +9 МБ/ABI | edit+save OOXML/ODF; требует MPL-решения и спайка |
@@ -151,7 +151,7 @@ interface DocumentSession {
 - **M1. Markdown** — ✅ выполнен 25.10.2026: модуль `:feature:markdown` — плагин SPI, парсер commonmark 0.24.0 (+GFM-таблицы/зачёркивание/списки задач) → собственная модель MdBlock/MdSpan (12 юнит-тестов), Compose-рендер без WebView, сессия с единым источником текста, поиск, оглавление, сохранение через SAF; экран «Текст / Сплит / Превью» с тулбаром разметки и защитой несохранённых правок. Размеры: debug 9,5 МБ, release (R8) 1,24 МБ.
 - **M2. PDF-просмотр** — ✅ выполнен 25.10.2026: модуль `:feature:pdf` — androidx.pdf 1.0.0-beta01 (PdfView: выделение/ссылки/поиск UI; sandbox-сервис; session-поиск через searchDocument) + fallback-движок на системном PdfRenderer (переключатель в шапке). Потребовал обновления стека: Gradle 8.14.3, AGP 8.13.0, Kotlin 2.2.20, compileSdk 36 (+extension 19), minSdk 28 (требование pdf-core). Размеры: debug 32,6 МБ / release (R8) **4,7 МБ**. Качество рендера — бенчмарк на устройстве (§13).
 - **M3. PDF-редактирование** — ✅ выполнен 25.10.2026: модуль `:feature:pdf-edit` — PDFBox-Android 2.0.27.0 (BouncyCastle исключён — криптоподписи не входят): заполнение AcroForm (текст/чекбоксы/радио/выбор), факсимиле — рисование пальцем или сохранённые подписи (DataStore, до 5), позиционирование тапом по предпросмотру страницы, сохранение через SAF + опциональный флаттер. Вход — «✎ Редактировать» из PDF-экрана. Размеры: debug 36,3 МБ / release **7,0 МБ**. JVM-тесты AcroForm помечены @Ignore: AFM-метрики порт читает только из Android-assets; логика форм проверяется на устройстве.
-- **M4. Книги**: foliate-js (epub/fb2/mobi/azw3/cbz), темы, закладки, позиции; cbr через junrar.
+- **M4. Книги** — ✅ выполнен 25.10.2026: модуль `:feature:books` + `:core:webview` (изолированный WebView на WebViewAssetLoader, домен appassets.androidplatform.net, сеть закрыта). Движок foliate-js (MIT, вендорен в assets, ~230 КБ): epub/fb2/mobi/azw3/cbz; cbr — junrar с конвертацией в cbz в кэше. Экран: темы (светлая/сепия/тёмная), размер шрифта, оглавление, закладки (DataStore), автосохранение позиции чтения с восстановлением. Внешние ссылки уходят в браузер. Размеры: debug 37,1 МБ / release **7,3 МБ**.
 - **M5. Офис-просмотр**: docx-preview/SheetJS/PPTXjs в WebView; сравнение вёрстки с Word на 10–15 реальных документах.
 - **M6. Правка данных**: динамический модуль POI (ячейки xlsx, раны docx); pdfium-режим при необходимости.
 - **M7. Полировка**: локализация (ru/en), size-проход, публикация (F-Droid/Play).

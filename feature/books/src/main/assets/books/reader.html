@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Книга</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; }
+  foliate-view { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<foliate-view id="view"></foliate-view>
+<script type="module">
+import './foliate-js/view.js'
+
+const view = document.getElementById('view')
+const bridge = window.AndroidBridge
+
+let style = {
+    bg: '#ffffff',
+    fg: '#1b1b1b',
+    fontSize: 100,
+    spacing: 1.6,
+    justify: true,
+    hyphenate: true,
+}
+
+const getCSS = ({ bg, fg, fontSize, spacing, justify, hyphenate }) => `
+    @namespace epub "http://www.idpf.org/2007/ops";
+    html { color-scheme: light dark; background: ${bg}; }
+    body { background: ${bg} !important; color: ${fg} !important; }
+    html { font-size: ${fontSize}% !important; }
+    p, li, blockquote, dd {
+        line-height: ${spacing};
+        text-align: ${justify ? 'justify' : 'start'};
+        -webkit-hyphens: ${hyphenate ? 'auto' : 'manual'};
+        hyphens: ${hyphenate ? 'auto' : 'manual'};
+        -webkit-hyphenate-limit-before: 3;
+        -webkit-hyphenate-limit-after: 2;
+        widows: 2;
+    }
+    [align="left"] { text-align: left; }
+    [align="center"] { text-align: center; }
+    [align="justify"] { text-align: justify; }
+    a:link { color: #4a6da7; }
+    pre { white-space: pre-wrap !important; }
+`
+
+function applyStyle() {
+    try { view.renderer && view.renderer.setStyles && view.renderer.setStyles(getCSS(style)) } catch (e) { console.error(e) }
+}
+
+view.addEventListener('relocate', e => {
+    const d = e.detail
+    if (!bridge) return
+    bridge.onRelocate(JSON.stringify({
+        fraction: d.fraction ?? 0,
+        index: d.index ?? 0,
+        chapter: (d.tocItem && d.tocItem.label) ? d.tocItem.label : '',
+        page: (d.pageItem && d.pageItem.label) ? d.pageItem.label : '',
+    }))
+})
+
+view.addEventListener('load', () => { applyStyle() })
+
+window.reader = {
+    async open(url) {
+        try {
+            const book = await view.open(url)
+            applyStyle()
+            if (book.toc) {
+                const flat = []
+                const walk = (items, level) => {
+                    for (const it of items || []) {
+                        flat.push({ label: it.label ?? '', href: it.href ?? '', level })
+                        if (it.subitems) walk([...it.subitems], level + 1)
+                    }
+                }
+                walk(book.toc, 0)
+                bridge && bridge.onToc(JSON.stringify(flat))
+            }
+            bridge && bridge.onLoaded()
+            return 'ok'
+        } catch (e) {
+            bridge && bridge.onError(String((e && e.message) || e))
+            return 'error'
+        }
+    },
+    goToFraction(f) { view.goToFraction(f) },
+    goTo(href) { const p = view.goTo(href); if (p && p.catch) p.catch(() => {}) },
+    next() { view.next() },
+    prev() { view.prev() },
+    setStyle(json) { style = Object.assign({}, style, JSON.parse(json)); applyStyle() },
+    setFlow(flow) { try { view.renderer && view.renderer.setAttribute && view.renderer.setAttribute('flow', flow) } catch (e) { console.error(e) } },
+}
+
+bridge && bridge.onPageReady()
+</script>
+</body>
+</html>
