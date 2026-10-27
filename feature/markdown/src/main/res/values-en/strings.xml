@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="md_save">Save</string>
+    <string name="md_exit_title">Unsaved changes</string>
+    <string name="md_exit_text">Exit without saving?</string>
+    <string name="md_discard">Discard</string>
+    <string name="md_save_exit">Save and exit</string>
+    <string name="md_mode_text">Text</string>
+    <string name="md_mode_split">Split</string>
+    <string name="md_mode_preview">Preview</string>
+</resources>

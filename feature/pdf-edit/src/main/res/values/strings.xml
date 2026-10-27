@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_title">Редактирование</string>
+    <string name="edit_save">Сохранить</string>
+    <string name="edit_saved">Сохранено</string>
+    <string name="edit_save_failed">Не удалось сохранить: %1$s</string>
+    <string name="edit_exit_title">Изменения не сохранены</string>
+    <string name="edit_exit_text">Выйти без сохранения?</string>
+    <string name="edit_discard">Не сохранять</string>
+    <string name="edit_save_exit">Сохранить и выйти</string>
+    <string name="edit_opening">Открываем документ…</string>
+    <string name="edit_open_failed">Не удалось открыть PDF: %1$s</string>
+    <string name="edit_apply_failed">Не удалось применить значение</string>
+    <string name="edit_tab_form">Форма</string>
+    <string name="edit_tab_fax">Факсимиле</string>
+    <string name="edit_no_fields">В этом PDF нет полей формы (AcroForm).\nИспользуйте вкладку «Факсимиле», чтобы поставить подпись.</string>
+    <string name="edit_readonly">(только чтение)</string>
+    <string name="edit_checked">Отмечено</string>
+    <string name="edit_unchecked">Не отмечено</string>
+    <string name="edit_no_options">Нет вариантов</string>
+    <string name="edit_flatten">Флаттер при сохранении (сделать поля неинтерактивными)</string>
+    <string name="fax_draw_hint">Нарисуйте подпись пальцем</string>
+    <string name="fax_saved">Сохранённые подписи</string>
+    <string name="fax_saved_cd">Сохранённая подпись</string>
+    <string name="fax_clear">Очистить</string>
+    <string name="fax_ready">Готово</string>
+    <string name="fax_page">Страница</string>
+    <string name="fax_width_hint">Ширина подписи: %1$d%%   ·   тапните по странице, чтобы выбрать место</string>
+    <string name="fax_back">← К подписи</string>
+    <string name="fax_stamp">Наложить</string>
+    <string name="fax_stamped">Факсимиле наложено</string>
+    <string name="fax_stamp_failed">Не удалось наложить факсимиле</string>
+</resources>

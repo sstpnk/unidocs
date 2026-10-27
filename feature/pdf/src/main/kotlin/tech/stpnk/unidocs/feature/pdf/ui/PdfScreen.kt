@@ -32,11 +32,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.pdf.view.PdfView
 import tech.stpnk.unidocs.feature.pdf.PdfSession
+import tech.stpnk.unidocs.feature.pdf.R
 import tech.stpnk.unidocs.feature.pdfedit.engine.PdfRendererEngine
 import tech.stpnk.unidocs.feature.pdfedit.ui.PdfEditScreen
 
@@ -55,10 +57,11 @@ fun PdfScreen(session: PdfSession, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = {
+                    val pagesShort = stringResource(R.string.pdf_pages_short)
                     Text(
                         text = buildString {
                             append(session.info.title)
-                            session.info.pageCount?.let { append("  ·  $it стр.") }
+                            session.info.pageCount?.let { append("  ·  $it $pagesShort") }
                         },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -70,7 +73,7 @@ fun PdfScreen(session: PdfSession, onBack: () -> Unit) {
                     }
                 },
                 actions = {
-                    TextButton(onClick = { editing = true }) { Text("✎ Редактировать") }
+                    TextButton(onClick = { editing = true }) { Text("✎ " + stringResource(R.string.pdf_edit)) }
                     FilterChip(
                         selected = fallback,
                         onClick = { fallback = !fallback },
@@ -143,7 +146,7 @@ private fun FallbackPdfView(session: PdfSession) {
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Страница ${index + 1}",
+                    contentDescription = stringResource(R.string.pdf_page_cd, index + 1),
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -174,7 +177,7 @@ private fun PagePlaceholder(pageNumber: Int) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "Страница $pageNumber…",
+            text = stringResource(R.string.pdf_page_placeholder, pageNumber),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

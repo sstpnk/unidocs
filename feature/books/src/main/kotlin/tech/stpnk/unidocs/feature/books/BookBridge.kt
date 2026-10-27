@@ -40,6 +40,12 @@ data class SearchEvent(
     val post: String? = null,
 )
 
+@Serializable
+data class SelectionDetail(
+    val cfi: String = "",
+    val text: String = "",
+)
+
 /**
  * JS-мост foliate-js → Kotlin. Методы вызываются на потоке WebView,
  * поэтому экран обязан перепрыгивать на main для изменения состояния.
@@ -52,6 +58,8 @@ class BookBridge(private val callbacks: Callbacks) {
         fun onRelocate(detail: RelocateDetail)
         fun onToc(entries: List<TocEntry>)
         fun onSearch(event: SearchEvent)
+        fun onSelection(detail: SelectionDetail)
+        fun onAnnotationTapped(cfi: String)
         fun onError(message: String)
     }
 
@@ -80,6 +88,17 @@ class BookBridge(private val callbacks: Callbacks) {
     fun onSearch(payload: String) {
         val event = runCatching { json.decodeFromString<SearchEvent>(payload) }.getOrNull() ?: return
         callbacks.onSearch(event)
+    }
+
+    @JavascriptInterface
+    fun onSelection(payload: String) {
+        val detail = runCatching { json.decodeFromString<SelectionDetail>(payload) }.getOrNull() ?: return
+        callbacks.onSelection(detail)
+    }
+
+    @JavascriptInterface
+    fun onAnnotationTapped(cfi: String) {
+        callbacks.onAnnotationTapped(cfi)
     }
 
     @JavascriptInterface

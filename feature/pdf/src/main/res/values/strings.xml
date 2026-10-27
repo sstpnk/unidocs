@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pdf_edit">Редактировать</string>
+    <string name="pdf_pages_short">стр.</string>
+    <string name="pdf_page_placeholder">Страница %1$d…</string>
+    <string name="pdf_page_cd">Страница %1$d</string>
+</resources>

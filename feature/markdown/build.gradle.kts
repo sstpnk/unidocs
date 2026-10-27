@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -34,6 +34,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:storage"))
     implementation(project(":core:ui"))
+    implementation(project(":core:webview"))
 
     implementation(libs.commonmark)
     implementation(libs.commonmark.ext.gfm.tables)

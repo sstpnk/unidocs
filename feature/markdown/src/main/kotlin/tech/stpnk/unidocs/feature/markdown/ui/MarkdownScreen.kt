@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -41,13 +42,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tech.stpnk.unidocs.feature.markdown.MarkdownSession
+import tech.stpnk.unidocs.feature.markdown.R
 import tech.stpnk.unidocs.feature.markdown.parser.MdBlock
 import androidx.compose.runtime.collectAsState
 
-private enum class ViewMode(val label: String) {
-    EDIT("Текст"),
-    SPLIT("Сплит"),
-    PREVIEW("Превью"),
+private enum class ViewMode {
+    EDIT,
+    SPLIT,
+    PREVIEW,
 }
 
 /**
@@ -96,7 +98,7 @@ fun MarkdownScreen(
                             onSave { ok -> if (ok) savedText = editorValue.text }
                         },
                     ) {
-                        Text("Сохранить")
+                        Text(stringResource(R.string.md_save))
                     }
                 },
             )
@@ -138,15 +140,15 @@ fun MarkdownScreen(
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
-            title = { Text("Изменения не сохранены") },
-            text = { Text("Выйти без сохранения?") },
+            title = { Text(stringResource(R.string.md_exit_title)) },
+            text = { Text(stringResource(R.string.md_exit_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showExitDialog = false
                         onBack()
                     },
-                ) { Text("Не сохранять") }
+                ) { Text(stringResource(R.string.md_discard)) }
             },
             dismissButton = {
                 TextButton(
@@ -154,7 +156,7 @@ fun MarkdownScreen(
                         showExitDialog = false
                         onSave { ok -> if (ok) onBack() }
                     },
-                ) { Text("Сохранить и выйти") }
+                ) { Text(stringResource(R.string.md_save_exit)) }
             },
         )
     }
@@ -167,10 +169,15 @@ private fun ModeChips(current: ViewMode, onSelect: (ViewMode) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ViewMode.entries.forEach { mode ->
+            val label = when (mode) {
+                ViewMode.EDIT -> stringResource(R.string.md_mode_text)
+                ViewMode.SPLIT -> stringResource(R.string.md_mode_split)
+                ViewMode.PREVIEW -> stringResource(R.string.md_mode_preview)
+            }
             FilterChip(
                 selected = mode == current,
                 onClick = { onSelect(mode) },
-                label = { Text(mode.label) },
+                label = { Text(label) },
             )
         }
     }

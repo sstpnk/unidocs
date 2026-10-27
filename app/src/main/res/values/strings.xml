@@ -3,4 +3,10 @@
     <string name="open_document">Открыть документ</string>
     <string name="recents_title">Недавние</string>
     <string name="empty_recents">Пока ничего не открыто.\nНажмите «Открыть документ», чтобы выбрать файл.</string>
+    <string name="app_no_plugin">Плагин для «%1$s» появится на следующих этапах</string>
+    <string name="app_opening_via">Открываем через плагин «%1$s»…</string>
+    <string name="app_no_access">Нет доступа к документу — запись удалена из «Недавних»</string>
+    <string name="app_open_failed">Не удалось открыть: %1$s</string>
+    <string name="app_saved">Сохранено</string>
+    <string name="app_save_failed">Не удалось сохранить: %1$s</string>
 </resources>

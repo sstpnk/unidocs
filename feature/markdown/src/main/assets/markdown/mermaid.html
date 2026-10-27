@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; padding: 8px; background: transparent; }
+  svg { max-width: 100%; height: auto; display: block; }
+  .err { white-space: pre-wrap; font-size: 11px; color: #b00020; font-family: monospace; }
+</style>
+</head>
+<body>
+<script src="./mermaid.min.js"></script>
+<script>
+var bridge = window.AndroidBridge
+
+function b64ToText(b64) {
+    return new TextDecoder().decode(Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0) }))
+}
+
+async function render(b64, theme) {
+    try {
+        mermaid.initialize({ startOnLoad: false, theme: theme || 'default', securityLevel: 'strict' })
+        var code = b64ToText(b64)
+        var id = 'm' + Math.random().toString(36).slice(2)
+        var result = await mermaid.render(id, code)
+        document.body.innerHTML = result.svg
+        bridge && bridge.onRendered(document.body.scrollHeight)
+    } catch (e) {
+        var message = String((e && e.message) || e)
+        document.body.innerHTML = '<div class="err">' + message.replace(/</g, '&lt;') + '</div>'
+        bridge && bridge.onError(message)
+    }
+}
+
+bridge && bridge.onPageReady()
+</script>
+</body>
+</html>

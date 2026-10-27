@@ -13,6 +13,7 @@
 <foliate-view id="view"></foliate-view>
 <script type="module">
 import './foliate-js/view.js'
+import { Overlayer } from './foliate-js/overlayer.js'
 
 const view = document.getElementById('view')
 const bridge = window.AndroidBridge
@@ -51,6 +52,50 @@ function applyStyle() {
     try { view.renderer && view.renderer.setStyles && view.renderer.setStyles(getCSS(style)) } catch (e) { console.error(e) }
 }
 
+function b64ToText(b64) {
+    return new TextDecoder().decode(Uint8Array.from(atob(b64), c => c.charCodeAt(0)))
+}
+
+// ===== Аннотации: реестр по секциям (пере-отрисовка при загрузке секции) =====
+const sectionAnnotations = new Map()
+const annotationsByValue = new Map()
+
+view.addEventListener('create-overlay', e => {
+    const { index } = e.detail
+    const list = sectionAnnotations.get(index)
+    if (list) for (const annotation of list) view.addAnnotation(annotation)
+})
+
+view.addEventListener('draw-annotation', e => {
+    const { draw, annotation } = e.detail
+    draw(Overlayer.highlight, { color: annotation.color })
+})
+
+view.addEventListener('show-annotation', e => {
+    bridge && bridge.onAnnotationTapped(e.detail.value)
+})
+
+// Захват выделения текста → CFI для создания аннотации
+view.addEventListener('load', ({ detail }) => {
+    applyStyle()
+    const { doc, index } = detail
+    if (!doc) return
+    doc.addEventListener('pointerup', function () {
+        setTimeout(function () {
+            try {
+                const sel = doc.getSelection()
+                if (!sel || sel.isCollapsed || !sel.rangeCount) return
+                const range = sel.getRangeAt(0)
+                const cfi = view.getCFI(index, range)
+                const text = sel.toString()
+                if (cfi && text.trim()) {
+                    bridge && bridge.onSelection(JSON.stringify({ cfi: cfi, text: text.slice(0, 200) }))
+                }
+            } catch (e) { console.error(e) }
+        }, 50)
+    })
+})
+
 view.addEventListener('relocate', e => {
     const d = e.detail
     if (!bridge) return
@@ -61,8 +106,6 @@ view.addEventListener('relocate', e => {
         page: (d.pageItem && d.pageItem.label) ? d.pageItem.label : '',
     }))
 })
-
-view.addEventListener('load', () => { applyStyle() })
 
 window.reader = {
     async open(url) {
@@ -93,6 +136,35 @@ window.reader = {
     prev() { view.prev() },
     setStyle(json) { style = Object.assign({}, style, JSON.parse(json)); applyStyle() },
     setFlow(flow) { try { view.renderer && view.renderer.setAttribute && view.renderer.setAttribute('flow', flow) } catch (e) { console.error(e) } },
+    addHighlight(cfiB64, color) {
+        return (async () => {
+            try {
+                const cfi = b64ToText(cfiB64)
+                const annotation = { value: cfi, color: color || 'yellow' }
+                const res = await view.addAnnotation(annotation)
+                const index = res && res.index
+                const list = sectionAnnotations.get(index) || []
+                list.push(annotation)
+                sectionAnnotations.set(index, list)
+                annotationsByValue.set(cfi, annotation)
+                return 'ok'
+            } catch (e) { return 'error: ' + String((e && e.message) || e) }
+        })()
+    },
+    removeHighlight(cfiB64) {
+        return (async () => {
+            try {
+                const cfi = b64ToText(cfiB64)
+                const annotation = annotationsByValue.get(cfi)
+                if (annotation) await view.deleteAnnotation(annotation)
+                annotationsByValue.delete(cfi)
+                for (const [index, list] of sectionAnnotations) {
+                    sectionAnnotations.set(index, list.filter(a => a.value !== cfi))
+                }
+                return 'ok'
+            } catch (e) { return 'error: ' + String((e && e.message) || e) }
+        })()
+    },
     search(query) {
         (async () => {
             try {
@@ -124,6 +196,7 @@ window.reader = {
     },
     clearSearch() { try { view.clearSearch() } catch (e) { console.error(e) } },
     goToCfi(cfi) { const p = view.goTo('foliate-search:' + cfi); if (p && p.catch) p.catch(function () {}) },
+    goToRaw(cfi) { const p = view.goTo(cfi); if (p && p.catch) p.catch(function () {}) },
 }
 
 bridge && bridge.onPageReady()

@@ -34,6 +34,10 @@
   var params = new URLSearchParams(location.search);
   var type = (params.get('type') || '').toLowerCase();
   var src = params.get('src') || '';
+  var lang = (params.get('lang') || 'ru').toLowerCase();
+  var T = lang === 'en'
+    ? { unsupported: 'Format not supported yet: ', renderFailed: 'Failed to render document: ' }
+    : { unsupported: 'Формат пока не поддерживается: ', renderFailed: 'Не удалось отобразить документ: ' };
   var bridge = window.AndroidBridge;
   var content = document.getElementById('content');
 
@@ -93,12 +97,12 @@
     if (bridge) bridge.onPageReady();
     var render = renderers[type];
     if (!render) {
-      showError('Формат пока не поддерживается: ' + type);
+      showError(T.unsupported + type);
       return;
     }
     Promise.resolve()
       .then(render)
-      .catch(function (e) { showError('Не удалось отобразить документ: ' + (e && e.message ? e.message : e)); });
+      .catch(function (e) { showError(T.renderFailed + (e && e.message ? e.message : e)); });
   });
 })();
 </script>

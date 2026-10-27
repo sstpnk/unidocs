@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.webkit.WebViewAssetLoader
@@ -32,6 +33,7 @@ import tech.stpnk.unidocs.core.webview.ASSET_HOST
 import tech.stpnk.unidocs.core.webview.IsolatedWebView
 import tech.stpnk.unidocs.feature.office.OfficeBridge
 import tech.stpnk.unidocs.feature.office.OfficeSession
+import tech.stpnk.unidocs.feature.office.R
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.atomic.AtomicReference
@@ -118,7 +120,8 @@ fun OfficeScreen(session: OfficeSession, onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             IsolatedWebView(
                 context = context,
-                startUrl = "$OFFICE_URL?type=${session.officeType}&src=https://$ASSET_HOST/media/${session.mediaName}",
+                startUrl = "$OFFICE_URL?type=${session.officeType}&src=https://$ASSET_HOST/media/${session.mediaName}" +
+                    "&lang=" + java.util.Locale.getDefault().language,
                 modifier = Modifier.fillMaxSize(),
                 jsBridgeName = "AndroidBridge",
                 jsBridge = bridge,
@@ -133,7 +136,7 @@ fun OfficeScreen(session: OfficeSession, onBack: () -> Unit) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Text(
-                            text = "Открываем документ…",
+                            text = stringResource(R.string.office_opening),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 12.dp),
                         )

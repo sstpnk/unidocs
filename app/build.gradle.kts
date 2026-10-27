@@ -23,8 +23,8 @@ android {
         // androidx.pdf требует minSdk 28 (Android 9+, ~98% активных устройств)
         minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.7.0"
+        versionCode = 8
+        versionName = "0.7.1"
 
         // Сжимаем ресурсы AndroidX только до используемых локалей
         resourceConfigurations += setOf("ru", "en")

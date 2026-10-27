@@ -25,6 +25,14 @@ data class ReadingPosition(
 )
 
 @Serializable
+data class BookAnnotation(
+    val cfi: String,
+    val text: String,
+    val color: String = "yellow",
+    val createdAtEpochMs: Long,
+)
+
+@Serializable
 data class Bookmark(
     val label: String,
     val fraction: Double,
@@ -95,8 +103,43 @@ class BooksStore(context: Context) {
         }
     }
 
+    private val annotationsSerializer = MapSerializer(String.serializer(), ListSerializer(BookAnnotation.serializer()))
+
+    fun annotations(uri: String): Flow<List<BookAnnotation>> = dataStore.data.map { prefs ->
+        prefs[KEY_ANNOTATIONS]?.let { raw ->
+            runCatching { json.decodeFromString(annotationsSerializer, raw)[uri] }.getOrNull()
+        }.orEmpty()
+    }
+
+    suspend fun currentAnnotations(uri: String): List<BookAnnotation> = annotations(uri).first()
+
+    suspend fun addAnnotation(uri: String, annotation: BookAnnotation) {
+        dataStore.edit { prefs ->
+            val map = prefs[KEY_ANNOTATIONS]
+                ?.let { runCatching { json.decodeFromString(annotationsSerializer, it) }.getOrDefault(emptyMap()) }
+                .orEmpty()
+                .toMutableMap()
+            val list = (map[uri].orEmpty().filterNot { it.cfi == annotation.cfi } + annotation)
+                .sortedByDescending { it.createdAtEpochMs }
+            map[uri] = list
+            prefs[KEY_ANNOTATIONS] = json.encodeToString(annotationsSerializer, map)
+        }
+    }
+
+    suspend fun removeAnnotation(uri: String, annotation: BookAnnotation) {
+        dataStore.edit { prefs ->
+            val map = prefs[KEY_ANNOTATIONS]
+                ?.let { runCatching { json.decodeFromString(annotationsSerializer, it) }.getOrDefault(emptyMap()) }
+                .orEmpty()
+                .toMutableMap()
+            map[uri] = map[uri].orEmpty().filterNot { it.cfi == annotation.cfi }
+            prefs[KEY_ANNOTATIONS] = json.encodeToString(annotationsSerializer, map)
+        }
+    }
+
     private companion object {
         val KEY_POSITIONS = stringPreferencesKey("positions")
         val KEY_BOOKMARKS = stringPreferencesKey("bookmarks")
+        val KEY_ANNOTATIONS = stringPreferencesKey("annotations")
     }
 }

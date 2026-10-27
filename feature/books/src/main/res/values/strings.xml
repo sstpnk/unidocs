@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="books_opening">Открываем книгу…</string>
+    <string name="books_search_hint">Найти в книге</string>
+    <string name="books_search">Найти</string>
+    <string name="books_found">Найдено: %1$d</string>
+    <string name="books_search_reset">Сбросить подсветку</string>
+    <string name="books_search_error">Ошибка поиска: %1$s</string>
+    <string name="books_toc">Оглавление</string>
+    <string name="books_toc_empty">В этой книге нет оглавления</string>
+    <string name="books_toc_no_title">(без названия)</string>
+    <string name="books_bookmarks">Закладки</string>
+    <string name="books_annotations">Аннотации</string>
+    <string name="books_bookmarks_empty">Закладок пока нет — нажмите ☆ в панели сверху</string>
+    <string name="books_annotations_empty">Аннотаций пока нет — выделите текст в книге и нажмите «Подсветить»</string>
+    <string name="books_annotation_title">Аннотация</string>
+    <string name="books_delete">Удалить</string>
+    <string name="books_close">Закрыть</string>
+    <string name="books_highlight">Подсветить</string>
+    <string name="books_theme_light">Светлая</string>
+    <string name="books_theme_sepia">Сепия</string>
+    <string name="books_theme_dark">Тёмная</string>
+    <string name="books_font_minus">Шрифт: − (%1$d%%)</string>
+    <string name="books_font_plus">Шрифт: + (%1$d%%)</string>
+</resources>

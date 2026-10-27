@@ -64,7 +64,11 @@ private fun BlockView(block: MdBlock) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        is MdBlock.Code -> CodeBlockView(block.code, block.language)
+        is MdBlock.Code -> if (block.language == "mermaid") {
+            MermaidDiagram(code = block.code)
+        } else {
+            CodeBlockView(block.code, block.language)
+        }
         is MdBlock.Quote -> QuoteView(block.blocks)
         is MdBlock.ListBlock -> ListView(block)
         is MdBlock.Table -> TableView(block)

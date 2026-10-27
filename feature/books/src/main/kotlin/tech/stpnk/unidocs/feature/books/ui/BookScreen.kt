@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.compose.foundation.background
@@ -20,12 +21,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -66,12 +70,16 @@ import kotlinx.coroutines.runBlocking
 import tech.stpnk.unidocs.core.model.OutlineNode
 import tech.stpnk.unidocs.core.webview.ASSET_HOST
 import tech.stpnk.unidocs.core.webview.IsolatedWebView
+import tech.stpnk.unidocs.feature.books.BookAnnotation
 import tech.stpnk.unidocs.feature.books.BookBridge
 import tech.stpnk.unidocs.feature.books.BookSession
+import tech.stpnk.unidocs.feature.books.R
 import tech.stpnk.unidocs.feature.books.ReadingPosition
 import tech.stpnk.unidocs.feature.books.SearchEvent
 import tech.stpnk.unidocs.feature.books.SearchItem
+import tech.stpnk.unidocs.feature.books.SelectionDetail
 import tech.stpnk.unidocs.feature.books.TocEntry
+import java.text.DateFormat
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.atomic.AtomicReference
@@ -119,11 +127,15 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
     var searchProgress by remember { mutableStateOf(0.0) }
     var searchResults by remember { mutableStateOf<List<SearchItem>>(emptyList()) }
     var searchSection by remember { mutableStateOf("") }
+    var selectionDetail by remember { mutableStateOf<SelectionDetail?>(null) }
+    var tappedAnnotationCfi by remember { mutableStateOf<String?>(null) }
+    var sheetTab by rememberSaveable { mutableStateOf(0) }
 
     var tocEntries by remember { mutableStateOf<List<TocEntry>>(emptyList()) }
     val bookmarks by session.store.bookmarks(session.sourceUri).collectAsState(initial = emptyList())
     val toc by session.toc.collectAsState()
     val chapter by session.chapter.collectAsState()
+    val annotations by session.store.annotations(session.sourceUri).collectAsState(initial = emptyList())
 
     var savedPosition by remember { mutableStateOf<ReadingPosition?>(null) }
     var positionRestored by remember { mutableStateOf(false) }
@@ -166,11 +178,29 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                 main.post {
                     opened = true
                     maybeRestorePosition()
+                    // Восстановление аннотаций: highlight рисуется через Overlayer,
+                    // create-overlay пере-рисует их при загрузке каждой секции.
+                    scope.launch {
+                        runCatching { session.store.currentAnnotations(session.sourceUri) }
+                            .onSuccess { annotations ->
+                                annotations.forEach { annotation ->
+                                    val cfiB64 = Base64.encodeToString(
+                                        annotation.cfi.toByteArray(Charsets.UTF_8),
+                                        Base64.NO_WRAP,
+                                    )
+                                    webView?.evaluateJavascript(
+                                        "reader.addHighlight('$cfiB64', '${annotation.color}')",
+                                        null,
+                                    )
+                                }
+                            }
+                    }
                 }
             }
 
             override fun onRelocate(detail: tech.stpnk.unidocs.feature.books.RelocateDetail) {
                 main.post {
+                    selectionDetail = null
                     maybeRestorePosition()
                     fraction = detail.fraction
                     pageLabel = detail.page
@@ -201,7 +231,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                     when {
                         event.error != null -> {
                             searchRunning = false
-                            report("Ошибка поиска: ${event.error}")
+                            report(context.getString(R.string.books_search_error, event.error))
                         }
 
                         event.done -> searchRunning = false
@@ -221,6 +251,14 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                         )
                     }
                 }
+            }
+
+            override fun onSelection(detail: SelectionDetail) {
+                main.post { selectionDetail = detail }
+            }
+
+            override fun onAnnotationTapped(cfi: String) {
+                main.post { tappedAnnotationCfi = cfi }
             }
 
             override fun onError(message: String) {
@@ -306,7 +344,12 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                             Text("Aa", style = MaterialTheme.typography.titleMedium)
                         }
                         DropdownMenu(expanded = settingsOpen, onDismissRequest = { settingsOpen = false }) {
-                            listOf("light" to "Светлая", "sepia" to "Сепия", "dark" to "Тёмная").forEach { (key, label) ->
+                            val themeLabels = listOf(
+                                "light" to stringResource(R.string.books_theme_light),
+                                "sepia" to stringResource(R.string.books_theme_sepia),
+                                "dark" to stringResource(R.string.books_theme_dark),
+                            )
+                            themeLabels.forEach { (key, label) ->
                                 DropdownMenuItem(
                                     text = { Text(if (theme == key) "● $label" else label) },
                                     onClick = {
@@ -317,11 +360,11 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                             }
                             HorizontalMenuDivider()
                             DropdownMenuItem(
-                                text = { Text("Шрифт: − ($fontScale%)") },
+                                text = { Text(stringResource(R.string.books_font_minus, fontScale)) },
                                 onClick = { fontScale = (fontScale - 10).coerceAtLeast(50) },
                             )
                             DropdownMenuItem(
-                                text = { Text("Шрифт: + ($fontScale%)") },
+                                text = { Text(stringResource(R.string.books_font_plus, fontScale)) },
                                 onClick = { fontScale = (fontScale + 10).coerceAtMost(250) },
                             )
                         }
@@ -410,10 +453,54 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Text(
-                            text = "Открываем книгу…",
+                            text = stringResource(R.string.books_opening),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 12.dp),
                         )
+                    }
+                }
+            }
+
+            selectionDetail?.let { selection ->
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                        .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = selection.text,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = {
+                        scope.launch {
+                            runCatching {
+                                session.store.addAnnotation(
+                                    session.sourceUri,
+                                    BookAnnotation(
+                                        cfi = selection.cfi,
+                                        text = selection.text,
+                                        color = "yellow",
+                                        createdAtEpochMs = System.currentTimeMillis(),
+                                    ),
+                                )
+                                val cfiB64 = Base64.encodeToString(
+                                    selection.cfi.toByteArray(Charsets.UTF_8),
+                                    Base64.NO_WRAP,
+                                )
+                                webView?.evaluateJavascript("reader.addHighlight('$cfiB64', 'yellow')", null)
+                                selectionDetail = null
+                            }
+                        }
+                    }) { Text(stringResource(R.string.books_highlight)) }
+                    IconButton(onClick = { selectionDetail = null }) {
+                        Text("✕")
                     }
                 }
             }
@@ -441,7 +528,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        label = { Text("Найти в книге") },
+                        label = { Text(stringResource(R.string.books_search_hint)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -459,7 +546,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                             }
                         },
                         enabled = !searchRunning && searchQuery.isNotBlank(),
-                    ) { Text("Найти") }
+                    ) { Text(stringResource(R.string.books_search)) }
                 }
 
                 if (searchRunning) {
@@ -475,7 +562,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Найдено: ${searchResults.size}",
+                        text = stringResource(R.string.books_found, searchResults.size),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     TextButton(
@@ -484,7 +571,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                             searchResults = emptyList()
                         },
                         enabled = searchResults.isNotEmpty(),
-                    ) { Text("Сбросить подсветку") }
+                    ) { Text(stringResource(R.string.books_search_reset)) }
                 }
 
                 LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
@@ -533,13 +620,13 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
         ModalBottomSheet(onDismissRequest = { tocOpen = false }) {
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 Text(
-                    text = "Оглавление",
+                    text = stringResource(R.string.books_toc),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 if (tocEntries.isEmpty()) {
                     Text(
-                        text = "В этой книге нет оглавления",
+                        text = stringResource(R.string.books_toc_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp),
@@ -548,7 +635,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                 LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
                     items(tocEntries) { entry ->
                         Text(
-                            text = entry.label.ifEmpty { "(без названия)" },
+                            text = entry.label.ifEmpty { stringResource(R.string.books_toc_no_title) },
                             style = if (entry.level == 0) {
                                 MaterialTheme.typography.bodyLarge
                             } else {
@@ -576,51 +663,143 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
     if (bookmarksOpen) {
         ModalBottomSheet(onDismissRequest = { bookmarksOpen = false }) {
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                Text(
-                    text = "Закладки",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                if (bookmarks.isEmpty()) {
-                    Text(
-                        text = "Закладок пока нет — нажмите ☆ в панели сверху",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = sheetTab == 0,
+                        onClick = { sheetTab = 0 },
+                        label = { Text(stringResource(R.string.books_bookmarks)) },
+                    )
+                    FilterChip(
+                        selected = sheetTab == 1,
+                        onClick = { sheetTab = 1 },
+                        label = { Text(stringResource(R.string.books_annotations)) },
                     )
                 }
-                LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
-                    items(bookmarks, key = { it.createdAtEpochMs }) { bookmark ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    bookmarksOpen = false
-                                    jumpToFraction(bookmark.fraction)
+
+                if (sheetTab == 0) {
+                    if (bookmarks.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.books_bookmarks_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                    LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
+                        items(bookmarks, key = { it.createdAtEpochMs }) { bookmark ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        bookmarksOpen = false
+                                        jumpToFraction(bookmark.fraction)
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = bookmark.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                    Text(
+                                        text = "${(bookmark.fraction * 100).toInt()}%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
                                 }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = bookmark.label,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                                Text(
-                                    text = "${(bookmark.fraction * 100).toInt()}%",
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
+                                TextButton(onClick = {
+                                    scope.launch { session.store.removeBookmark(session.sourceUri, bookmark) }
+                                }) { Text("✕") }
                             }
-                            TextButton(onClick = {
-                                scope.launch { session.store.removeBookmark(session.sourceUri, bookmark) }
-                            }) { Text("✕") }
+                        }
+                    }
+                } else {
+                    if (annotations.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.books_annotations_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                    LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
+                        items(annotations, key = { it.cfi }) { annotation ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        bookmarksOpen = false
+                                        webView?.evaluateJavascript(
+                                            "reader.goToRaw(\"${escapeJs(annotation.cfi)}\")",
+                                            null,
+                                        )
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                            ) {
+                                Text(
+                                    text = annotation.text,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                                            .format(java.util.Date(annotation.createdAtEpochMs)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            session.store.removeAnnotation(session.sourceUri, annotation)
+                                            val cfiB64 = Base64.encodeToString(
+                                                annotation.cfi.toByteArray(Charsets.UTF_8),
+                                                Base64.NO_WRAP,
+                                            )
+                                            webView?.evaluateJavascript("reader.removeHighlight('$cfiB64')", null)
+                                        }
+                                    }) { Text("✕") }
+                                }
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         }
                     }
                 }
             }
         }
+    }
+
+    tappedAnnotationCfi?.let { tappedCfi ->
+        val annotation = annotations.firstOrNull { it.cfi == tappedCfi }
+        AlertDialog(
+            onDismissRequest = { tappedAnnotationCfi = null },
+            title = { Text(stringResource(R.string.books_annotation_title)) },
+            text = { Text(annotation?.text ?: "") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        annotation?.let {
+                            session.store.removeAnnotation(session.sourceUri, it)
+                            val cfiB64 = Base64.encodeToString(
+                                it.cfi.toByteArray(Charsets.UTF_8),
+                                Base64.NO_WRAP,
+                            )
+                            webView?.evaluateJavascript("reader.removeHighlight('$cfiB64')", null)
+                        }
+                    }
+                    tappedAnnotationCfi = null
+                }) { Text(stringResource(R.string.books_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { tappedAnnotationCfi = null }) { Text(stringResource(R.string.books_close)) }
+            },
+        )
     }
 }
 

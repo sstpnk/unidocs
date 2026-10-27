@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pdf_edit">Edit</string>
+    <string name="pdf_pages_short">pp.</string>
+    <string name="pdf_page_placeholder">Page %1$d…</string>
+    <string name="pdf_page_cd">Page %1$d</string>
+</resources>

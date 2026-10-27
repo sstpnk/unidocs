@@ -1,6 +1,7 @@
 package tech.stpnk.unidocs
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -25,12 +26,15 @@ import tech.stpnk.unidocs.feature.books.BookPlugin
 import tech.stpnk.unidocs.feature.markdown.MarkdownPlugin
 import tech.stpnk.unidocs.feature.office.OfficePlugin
 import tech.stpnk.unidocs.feature.pdf.PdfPlugin
+import tech.stpnk.unidocs.R
 
 /**
  * M1: файловый менеджер (SAF) + «Недавние» + открытие документов через плагины.
  * Реестр плагинов: Markdown; остальные форматы приходят в M2–M6.
  */
 class DocumentsViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val appContext: Context get() = getApplication()
 
     private val recentsStore = RecentsStore(application)
 
@@ -82,7 +86,7 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
                 )
 
                 if (plugin == null) {
-                    _messages.emit("Плагин для «${meta.displayName}» появится на этапах M2–M6")
+                    _messages.emit(context.getString(R.string.app_no_plugin, meta.displayName))
                     return@launch
                 }
 
@@ -99,9 +103,9 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
                 _session.value = opened
             } catch (e: SecurityException) {
                 recentsStore.remove(uri.toString())
-                _messages.emit("Нет доступа к документу — запись удалена из «Недавних»")
+                _messages.emit(context.getString(R.string.app_no_access))
             } catch (e: Exception) {
-                _messages.emit("Не удалось открыть: ${e.message ?: e.javaClass.simpleName}")
+                _messages.emit(context.getString(R.string.app_open_failed, e.message ?: e.javaClass.simpleName))
             }
         }
     }
@@ -118,9 +122,9 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
             val ok = result.isSuccess
             _messages.emit(
                 if (ok) {
-                    "Сохранено"
+                    appContext.getString(R.string.app_saved)
                 } else {
-                    "Не удалось сохранить: ${result.exceptionOrNull()?.message ?: "ошибка"}"
+                    appContext.getString(R.string.app_save_failed, result.exceptionOrNull()?.message ?: "—")
                 },
             )
             onResult(ok)

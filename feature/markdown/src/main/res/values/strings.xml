@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="md_save">Сохранить</string>
+    <string name="md_exit_title">Изменения не сохранены</string>
+    <string name="md_exit_text">Выйти без сохранения?</string>
+    <string name="md_discard">Не сохранять</string>
+    <string name="md_save_exit">Сохранить и выйти</string>
+    <string name="md_mode_text">Текст</string>
+    <string name="md_mode_split">Сплит</string>
+    <string name="md_mode_preview">Превью</string>
+</resources>

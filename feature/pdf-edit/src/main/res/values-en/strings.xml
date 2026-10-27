@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_title">Edit</string>
+    <string name="edit_save">Save</string>
+    <string name="edit_saved">Saved</string>
+    <string name="edit_save_failed">Failed to save: %1$s</string>
+    <string name="edit_exit_title">Unsaved changes</string>
+    <string name="edit_exit_text">Exit without saving?</string>
+    <string name="edit_discard">Discard</string>
+    <string name="edit_save_exit">Save and exit</string>
+    <string name="edit_opening">Opening document…</string>
+    <string name="edit_open_failed">Failed to open PDF: %1$s</string>
+    <string name="edit_apply_failed">Failed to apply value</string>
+    <string name="edit_tab_form">Form</string>
+    <string name="edit_tab_fax">Facsimile</string>
+    <string name="edit_no_fields">This PDF has no form fields (AcroForm).\nUse the “Facsimile” tab to place a signature.</string>
+    <string name="edit_readonly">(read-only)</string>
+    <string name="edit_checked">Checked</string>
+    <string name="edit_unchecked">Unchecked</string>
+    <string name="edit_no_options">No options</string>
+    <string name="edit_flatten">Flatten on save (make fields non-interactive)</string>
+    <string name="fax_draw_hint">Draw your signature with your finger</string>
+    <string name="fax_saved">Saved signatures</string>
+    <string name="fax_saved_cd">Saved signature</string>
+    <string name="fax_clear">Clear</string>
+    <string name="fax_ready">Done</string>
+    <string name="fax_page">Page</string>
+    <string name="fax_width_hint">Signature width: %1$d%%   ·   tap the page to choose position</string>
+    <string name="fax_back">← Back to signature</string>
+    <string name="fax_stamp">Apply</string>
+    <string name="fax_stamped">Signature applied</string>
+    <string name="fax_stamp_failed">Failed to apply signature</string>
+</resources>

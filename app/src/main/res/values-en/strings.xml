@@ -4,4 +4,10 @@
     <string name="open_document">Open document</string>
     <string name="recents_title">Recent</string>
     <string name="empty_recents">Nothing opened yet.\nTap “Open document” to pick a file.</string>
+    <string name="app_no_plugin">Plugin for “%1$s” will arrive in later milestones</string>
+    <string name="app_opening_via">Opening via “%1$s” plugin…</string>
+    <string name="app_no_access">No access to the document — removed from Recents</string>
+    <string name="app_open_failed">Failed to open: %1$s</string>
+    <string name="app_saved">Saved</string>
+    <string name="app_save_failed">Failed to save: %1$s</string>
 </resources>

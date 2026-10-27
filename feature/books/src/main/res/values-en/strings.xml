@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="books_opening">Opening book…</string>
+    <string name="books_search_hint">Search in book</string>
+    <string name="books_search">Search</string>
+    <string name="books_found">Found: %1$d</string>
+    <string name="books_search_reset">Clear highlights</string>
+    <string name="books_search_error">Search error: %1$s</string>
+    <string name="books_toc">Table of contents</string>
+    <string name="books_toc_empty">This book has no table of contents</string>
+    <string name="books_toc_no_title">(untitled)</string>
+    <string name="books_bookmarks">Bookmarks</string>
+    <string name="books_annotations">Annotations</string>
+    <string name="books_bookmarks_empty">No bookmarks yet — tap ☆ in the top bar</string>
+    <string name="books_annotations_empty">No annotations yet — select text in the book and tap “Highlight”</string>
+    <string name="books_annotation_title">Annotation</string>
+    <string name="books_delete">Delete</string>
+    <string name="books_close">Close</string>
+    <string name="books_highlight">Highlight</string>
+    <string name="books_theme_light">Light</string>
+    <string name="books_theme_sepia">Sepia</string>
+    <string name="books_theme_dark">Dark</string>
+    <string name="books_font_minus">Font: − (%1$d%%)</string>
+    <string name="books_font_plus">Font: + (%1$d%%)</string>
+</resources>

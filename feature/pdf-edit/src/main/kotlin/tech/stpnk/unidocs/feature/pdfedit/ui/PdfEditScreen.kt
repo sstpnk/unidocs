@@ -36,12 +36,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import tech.stpnk.unidocs.feature.pdfedit.PdfEditController
+import tech.stpnk.unidocs.feature.pdfedit.R
 import tech.stpnk.unidocs.feature.pdfedit.form.FieldValue
 import tech.stpnk.unidocs.feature.pdfedit.form.FormFieldKind
 import tech.stpnk.unidocs.feature.pdfedit.form.FormFieldUi
@@ -99,7 +101,7 @@ fun PdfEditScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Редактирование" + if (dirty) " •" else "",
+                        text = stringResource(R.string.edit_title) + if (dirty) " •" else "",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -117,12 +119,19 @@ fun PdfEditScreen(
                                     .onSuccess {
                                         dirty = false
                                         fields = controller.fieldsSnapshot()
-                                        report("Сохранено")
+                                        report(context.getString(R.string.edit_saved))
                                     }
-                                    .onFailure { report("Не удалось сохранить: ${it.message ?: "ошибка"}") }
+                                    .onFailure {
+                                        report(
+                                            context.getString(
+                                                R.string.edit_save_failed,
+                                                it.message ?: "—",
+                                            ),
+                                        )
+                                    }
                             }
                         },
-                    ) { Text("Сохранить") }
+                    ) { Text(stringResource(R.string.edit_save)) }
                 },
             )
         },
@@ -134,10 +143,14 @@ fun PdfEditScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 EditTab.entries.forEach { item ->
+                    val label = when (item) {
+                        EditTab.FORM -> stringResource(R.string.edit_tab_form)
+                        EditTab.FACSIMILE -> stringResource(R.string.edit_tab_fax)
+                    }
                     FilterChip(
                         selected = tab == item,
                         onClick = { tab = item },
-                        label = { Text(item.label) },
+                        label = { Text(label) },
                     )
                 }
             }
@@ -149,7 +162,7 @@ fun PdfEditScreen(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     CircularProgressIndicator()
-                    Text("Открываем документ…", modifier = Modifier.padding(top = 12.dp))
+                    Text(stringResource(R.string.edit_opening), modifier = Modifier.padding(top = 12.dp))
                 }
 
                 tab == EditTab.FORM -> FormTab(
@@ -163,7 +176,7 @@ fun PdfEditScreen(
                                 dirty = true
                                 fields = controller.fieldsSnapshot()
                             } else {
-                                report("Не удалось применить значение")
+                                report(context.getString(R.string.edit_apply_failed))
                             }
                         }
                     },
@@ -182,10 +195,10 @@ fun PdfEditScreen(
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
-            title = { Text("Изменения не сохранены") },
-            text = { Text("Выйти без сохранения?") },
+            title = { Text(stringResource(R.string.edit_exit_title)) },
+            text = { Text(stringResource(R.string.edit_exit_text)) },
             confirmButton = {
-                TextButton(onClick = { showExitDialog = false; onClose() }) { Text("Не сохранять") }
+                TextButton(onClick = { showExitDialog = false; onClose() }) { Text(stringResource(R.string.edit_discard)) }
             },
             dismissButton = {
                 TextButton(
@@ -194,10 +207,17 @@ fun PdfEditScreen(
                         scope.launch {
                             runCatching { controller.saveTo(flatten = flattenOnSave) }
                                 .onSuccess { onClose() }
-                                .onFailure { report("Не удалось сохранить: ${it.message ?: "ошибка"}") }
+                                .onFailure {
+                                    report(
+                                        context.getString(
+                                            R.string.edit_save_failed,
+                                            it.message ?: "—",
+                                        ),
+                                    )
+                                }
                         }
                     },
-                ) { Text("Сохранить и выйти") }
+                ) { Text(stringResource(R.string.edit_save_exit)) }
             },
         )
     }
@@ -217,7 +237,7 @@ private fun FormTab(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "В этом PDF нет полей формы (AcroForm).\nИспользуйте вкладку «Факсимиле», чтобы поставить подпись.",
+                text = stringResource(R.string.edit_no_fields),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -237,7 +257,7 @@ private fun FormTab(
             ) {
                 Checkbox(checked = flattenOnSave, onCheckedChange = onFlattenChange)
                 Text(
-                    text = "Флаттер при сохранении (сделать поля неинтерактивными)",
+                    text = stringResource(R.string.edit_flatten),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -249,7 +269,7 @@ private fun FormTab(
 private fun FieldRow(field: FormFieldUi, onApply: (String, FieldValue) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
-            text = field.label + if (field.readOnly) "  (только чтение)" else "",
+            text = field.label + if (field.readOnly) " " + stringResource(R.string.edit_readonly) else "",
             style = MaterialTheme.typography.labelLarge,
         )
         when (field.kind) {
@@ -278,7 +298,11 @@ private fun FieldRow(field: FormFieldUi, onApply: (String, FieldValue) -> Unit) 
                         onCheckedChange = { onApply(field.id, FieldValue.Check(it)) },
                         enabled = !field.readOnly,
                     )
-                    Text(if (field.checked == true) "Отмечено" else "Не отмечено")
+                    Text(
+                        text = stringResource(
+                            if (field.checked == true) R.string.edit_checked else R.string.edit_unchecked,
+                        ),
+                    )
                 }
             }
 
@@ -294,7 +318,7 @@ private fun FieldRow(field: FormFieldUi, onApply: (String, FieldValue) -> Unit) 
                     }
                 }
                 if (field.options.isEmpty()) {
-                    Text("Нет вариантов", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.edit_no_options), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

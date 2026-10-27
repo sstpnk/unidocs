@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import tech.stpnk.unidocs.feature.pdfedit.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
@@ -95,7 +97,7 @@ fun SignaturePad(modifier: Modifier = Modifier, onReady: (Bitmap) -> Unit) {
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            TextButton(onClick = { strokes.clear(); invalidator++ }) { Text("Очистить") }
+            TextButton(onClick = { strokes.clear(); invalidator++ }) { Text(stringResource(R.string.fax_clear)) }
             Spacer(Modifier.weight(1f))
             Button(
                 onClick = {
@@ -103,7 +105,7 @@ fun SignaturePad(modifier: Modifier = Modifier, onReady: (Bitmap) -> Unit) {
                 },
                 enabled = strokes.isNotEmpty(),
             ) {
-                Text("Готово")
+                Text(stringResource(R.string.fax_ready))
             }
         }
     }

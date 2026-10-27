@@ -47,11 +47,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.stpnk.unidocs.feature.pdfedit.PdfEditController
+import tech.stpnk.unidocs.feature.pdfedit.R
 import tech.stpnk.unidocs.feature.pdfedit.engine.PdfRendererEngine
 import tech.stpnk.unidocs.feature.pdfedit.signature.SignatureStore
 import java.io.ByteArrayOutputStream
@@ -94,7 +96,7 @@ fun FacsimileTab(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Нарисуйте подпись пальцем", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.fax_draw_hint), style = MaterialTheme.typography.titleSmall)
         SignaturePad(modifier = Modifier.fillMaxWidth().height(200.dp)) { bitmap ->
             val bytes = ByteArrayOutputStream().use { stream ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
@@ -107,7 +109,7 @@ fun FacsimileTab(
 
         if (saved.isNotEmpty()) {
             Text(
-                text = "Сохранённые подписи",
+                text = stringResource(R.string.fax_saved),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = 16.dp),
             )
@@ -132,7 +134,7 @@ fun FacsimileTab(
                             bitmap?.let {
                                 Image(
                                     bitmap = it.asImageBitmap(),
-                                    contentDescription = "Сохранённая подпись",
+                                    contentDescription = stringResource(R.string.fax_saved_cd),
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier.fillMaxSize(),
                                 )
@@ -183,7 +185,7 @@ private fun PlacementView(
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Страница", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.fax_page), style = MaterialTheme.typography.bodyMedium)
             IconButton(onClick = { if (page > 0) page-- }, enabled = page > 0) {
                 Text("−", style = MaterialTheme.typography.titleLarge)
             }
@@ -232,7 +234,7 @@ private fun PlacementView(
         }
 
         Text(
-            text = "Ширина подписи: ${(widthPct * 100).toInt()}%   ·   тапните по странице, чтобы выбрать место",
+            text = stringResource(R.string.fax_width_hint, (widthPct * 100).toInt()),
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 8.dp),
         )
@@ -243,7 +245,7 @@ private fun PlacementView(
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("← К подписи") }
+            TextButton(onClick = onBack) { Text(stringResource(R.string.fax_back)) }
             Box(modifier = Modifier.weight(1f))
             Button(
                 enabled = !stamping,
@@ -253,14 +255,14 @@ private fun PlacementView(
                         val ok = controller.stampSignature(page, centerX, centerY, widthPct, pngBytes)
                         stamping = false
                         if (ok) {
-                            onMessage("Факсимиле наложено")
+                            onMessage(context.getString(R.string.fax_stamped))
                             onStamped()
                         } else {
-                            onMessage("Не удалось наложить факсимиле")
+                            onMessage(context.getString(R.string.fax_stamp_failed))
                         }
                     }
                 },
-            ) { Text("Наложить") }
+            ) { Text(stringResource(R.string.fax_stamp)) }
         }
     }
 }
