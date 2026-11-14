@@ -114,12 +114,12 @@ object PdfFormOps {
                     }
 
                     is PDComboBox -> {
-                        field.setValue(listOf(value.option))
+                        field.setValue(value.option)
                         true
                     }
 
                     is PDListBox -> {
-                        field.setValue(listOf(value.option))
+                        field.setValue(value.option)
                         true
                     }
 

@@ -6,9 +6,15 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val appVersionName = "1.0"
+val appVersionCode = 9
 val signingProps = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
+}
+
+base {
+    archivesName = "unidoc-v$appVersionName"
 }
 
 android {
@@ -23,8 +29,8 @@ android {
         // androidx.pdf требует minSdk 28 (Android 9+, ~98% активных устройств)
         minSdk = 28
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.7.1"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         // Сжимаем ресурсы AndroidX только до используемых локалей
         resourceConfigurations += setOf("ru", "en")
@@ -64,6 +70,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 kotlin {
@@ -88,4 +100,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.androidx.compose.ui.test.manifest)
 }

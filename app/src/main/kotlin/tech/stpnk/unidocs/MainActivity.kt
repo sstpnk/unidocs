@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import tech.stpnk.unidocs.core.storage.RecentDocument
 import tech.stpnk.unidocs.core.ui.theme.UnidocsTheme
+import tech.stpnk.unidocs.ui.RecentList
 import tech.stpnk.unidocs.feature.books.BookSession
 import tech.stpnk.unidocs.feature.books.ui.BookScreen
 import tech.stpnk.unidocs.feature.markdown.MarkdownSession
@@ -187,47 +188,4 @@ private fun EmptyRecents() {
     }
 }
 
-@Composable
-private fun RecentList(
-    items: List<RecentDocument>,
-    onOpen: (Uri) -> Unit,
-    onRemove: (String) -> Unit,
-) {
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(items, key = { it.uri }) { doc ->
-            ListItem(
-                headlineContent = {
-                    Text(doc.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
-                supportingContent = {
-                    Text(
-                        text = listOfNotNull(
-                            doc.mimeType ?: "неизвестный тип",
-                            doc.sizeBytes?.let { formatBytes(it) },
-                            DateFormat.getDateInstance(DateFormat.SHORT).format(Date(doc.openedAtEpochMs)),
-                        ).joinToString("  •  "),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                trailingContent = {
-                    Row {
-                        IconButton(onClick = { onRemove(doc.uri) }) {
-                            Text("✕", style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-        }
-        item { Spacer(modifier = Modifier.height(72.dp)) }
-    }
-}
 
-private fun formatBytes(bytes: Long): String = when {
-    bytes >= 1 shl 30 -> "%.1f ГБ".format(bytes.toDouble() / (1 shl 30))
-    bytes >= 1 shl 20 -> "%.1f МБ".format(bytes.toDouble() / (1 shl 20))
-    bytes >= 1 shl 10 -> "%.1f КБ".format(bytes.toDouble() / (1 shl 10))
-    else -> "$bytes Б"
-}

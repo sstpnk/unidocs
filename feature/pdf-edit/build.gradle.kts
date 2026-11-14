@@ -29,6 +29,7 @@ android {
     testOptions {
         // pdfbox-android пишет в android.util.Log — на JVM возвращаем заглушки
         unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -51,4 +52,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }

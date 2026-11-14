@@ -63,7 +63,7 @@ class OdtToHtmlTest {
     }
 
     @Test
-    fun `content without acroform-like body fails clearly`() {
+    fun `content without body fails clearly`() {
         val bytes = ByteArrayOutputStream().apply {
             ZipOutputStream(this).use { zip ->
                 zip.putNextEntry(ZipEntry("mimetype"))
@@ -73,5 +73,52 @@ class OdtToHtmlTest {
         }.toByteArray()
         val result = runCatching { OdtToHtml.convertStream(ByteArrayInputStream(bytes)) }
         assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `table colspan and embedded image render`() {
+        // 1×1 прозрачный PNG (канонический минимальный файл)
+        val png = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06,
+            0x00, 0x00, 0x00, 0x1F, 0x15.toByte(), 0xC4.toByte(), 0x89.toByte(), 0x00, 0x00, 0x00,
+            0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C.toByte(), 0x63.toByte(), 0x00, 0x01, 0x00,
+            0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4.toByte(), 0x00, 0x00, 0x00, 0x00,
+            0x49, 0x45, 0x4E, 0x44, 0xAE.toByte(), 0x42, 0x60, 0x82.toByte(),
+        )
+        val contentXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content
+                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+                xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+                xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+                xmlns:xlink="http://www.w3.org/1999/xlink">
+              <office:body><office:text>
+                <table:table>
+                  <table:table-row>
+                    <table:table-cell table:number-columns-spanned="2"><text:p>Объединена</text:p></table:table-cell>
+                  </table:table-row>
+                </table:table>
+                <text:p><draw:image xlink:href="Pictures/img.png"/></text:p>
+              </office:text></office:body>
+            </office:document-content>
+        """.trimIndent()
+
+        val bytes = ByteArrayOutputStream().use { out ->
+            ZipOutputStream(out).use { zip ->
+                zip.putNextEntry(ZipEntry("content.xml"))
+                zip.write(contentXml.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+                zip.putNextEntry(ZipEntry("Pictures/img.png"))
+                zip.write(png)
+                zip.closeEntry()
+            }
+            out.toByteArray()
+        }
+
+        val html = OdtToHtml.convertStream(ByteArrayInputStream(bytes))
+        assertTrue("нет colspan", html.contains("colspan=\"2\""))
+        assertTrue("нет встроенной картинки", html.contains("data:image/png;base64,"))
     }
 }

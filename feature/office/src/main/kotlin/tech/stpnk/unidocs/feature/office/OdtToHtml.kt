@@ -2,7 +2,6 @@ package tech.stpnk.unidocs.feature.office
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
@@ -10,6 +9,7 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
+import java.util.Base64
 import java.util.zip.ZipInputStream
 
 /**
@@ -134,7 +134,7 @@ object OdtToHtml {
                 out.append("</td>")
             }
 
-            name == "image" && parser.namespace.endsWith("draw:1.0") -> {
+            name == "image" && (parser.namespace.endsWith("drawing:1.0")) -> {
                 val href = parser.getAttributeValue(NS_XLINK, "href").orEmpty()
                 val bytes = entries[href]
                 if (bytes != null && bytes.size <= MAX_IMAGE_BYTES) {
@@ -144,7 +144,7 @@ object OdtToHtml {
                         href.endsWith(".gif", true) -> "image/gif"
                         else -> "image/png"
                     }
-                    val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    val base64 = Base64.getEncoder().encodeToString(bytes)
                     out.append("<img alt=\"\" src=\"data:$mime;base64,$base64\">")
                 } else {
                     out.append("<p><i>[изображение]</i></p>")

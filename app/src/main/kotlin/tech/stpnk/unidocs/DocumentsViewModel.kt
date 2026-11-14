@@ -39,14 +39,7 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
     private val recentsStore = RecentsStore(application)
 
     /** Порядок регистрации важен: более специфичные плагины — раньше. */
-    private val registry = PluginRegistry(
-        listOf(
-            PdfPlugin(application),
-            BookPlugin(application),
-            OfficePlugin(application),
-            MarkdownPlugin(application),
-        ),
-    )
+    private val registry = PluginRegistry(createDocumentPlugins(application))
 
     val recents: StateFlow<List<RecentDocument>> = recentsStore.recents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
