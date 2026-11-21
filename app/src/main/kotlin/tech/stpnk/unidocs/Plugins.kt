@@ -4,6 +4,7 @@ import android.app.Application
 import tech.stpnk.unidocs.core.model.DocumentPlugin
 import tech.stpnk.unidocs.feature.books.BookPlugin
 import tech.stpnk.unidocs.feature.markdown.MarkdownPlugin
+import tech.stpnk.unidocs.feature.markdown.TextPlugin
 import tech.stpnk.unidocs.feature.office.OfficePlugin
 import tech.stpnk.unidocs.feature.pdf.PdfPlugin
 
@@ -17,4 +18,6 @@ internal fun createDocumentPlugins(application: Application): List<DocumentPlugi
     BookPlugin(application),
     OfficePlugin(application),
     MarkdownPlugin(application),
+    // TextPlugin последним: text/plain не должен перехватывать .md
+    TextPlugin(application),
 )

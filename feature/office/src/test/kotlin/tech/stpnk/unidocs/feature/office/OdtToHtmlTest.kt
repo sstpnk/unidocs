@@ -121,4 +121,40 @@ class OdtToHtmlTest {
         assertTrue("нет colspan", html.contains("colspan=\"2\""))
         assertTrue("нет встроенной картинки", html.contains("data:image/png;base64,"))
     }
+
+    @Test
+    fun `odt text styles apply bold and alignment`() {
+        val contentXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content
+                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+                xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+                xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+              <office:automatic-styles>
+                <style:style style:name="T1" style:family="text">
+                  <style:text-properties fo:font-weight="bold" fo:color="#c00000"/>
+                </style:style>
+                <style:style style:name="P2" style:family="paragraph" style:parent-style-name="Standard">
+                  <style:paragraph-properties fo:text-align="center"/>
+                </style:style>
+              </office:automatic-styles>
+              <office:body><office:text>
+                <text:p text:style-name="P2">Центр с <text:span text:style-name="T1">важным</text:span></text:p>
+              </office:text></office:body>
+            </office:document-content>
+        """.trimIndent()
+        val bytes = ByteArrayOutputStream().use { out ->
+            ZipOutputStream(out).use { zip ->
+                zip.putNextEntry(ZipEntry("content.xml"))
+                zip.write(contentXml.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+            out.toByteArray()
+        }
+        val html = OdtToHtml.convertStream(ByteArrayInputStream(bytes))
+        assertTrue("нет bold", html.contains("font-weight:bold"))
+        assertTrue("нет цвета", html.contains("#c00000"))
+        assertTrue("нет выравнивания", html.contains("text-align:center"))
+    }
 }

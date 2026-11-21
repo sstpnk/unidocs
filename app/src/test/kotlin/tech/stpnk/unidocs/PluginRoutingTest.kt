@@ -67,9 +67,15 @@ class PluginRoutingTest {
     }
 
     @Test
+    fun `plain text routes to text plugin`() {
+        assertEquals("text", routeTo("notes.txt"))
+        assertEquals("text", routeTo("notes.txt", "text/plain"))
+        assertEquals("text", routeTo("debug.log"))
+    }
+
+    @Test
     fun `unsupported types route nowhere`() {
         assertNull(routeTo("archive.zip", "application/zip"))
-        assertNull(routeTo("notes.txt", "text/plain"))
         assertNull(routeTo("старый.doc", "application/msword"))
         assertNull(routeTo("image.png", "image/png"))
     }

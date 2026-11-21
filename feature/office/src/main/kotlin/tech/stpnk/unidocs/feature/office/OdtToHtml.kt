@@ -13,10 +13,9 @@ import java.util.Base64
 import java.util.zip.ZipInputStream
 
 /**
- * Лёгкий конвертер ODT → HTML (свой, без тяжёлых движков):
- * читает content.xml из zip, отдаёт HTML с абзацами, заголовками,
- * списками, таблицами и встроенными (base64) картинками.
- * Поддержка подмножества: h/p/list/table/image/span/a/s/tab/line-break.
+ * Конвертер ODT → HTML: заголовки, абзацы, списки, таблицы (вкл. colspan),
+ * картинки (base64 ≤ 2 МБ) и ФОРМАТИРОВАНИЕ текста через автоматические стили
+ * (жирный/курсив/подчёркивание/цвет/размер/выравнивание, наследование parent-style).
  */
 object OdtToHtml {
 
@@ -26,6 +25,7 @@ object OdtToHtml {
     private val NS_OFFICE = "urn:oasis:names:tc:opendocument:xmlns:office:1.0"
     private val NS_TEXT = "urn:oasis:names:tc:opendocument:xmlns:text:1.0"
     private val NS_TABLE = "urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    private val NS_STYLE = "urn:oasis:names:tc:opendocument:xmlns:style:1.0"
     private val NS_XLINK = "http://www.w3.org/1999/xlink"
 
     suspend fun convert(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
@@ -37,10 +37,11 @@ object OdtToHtml {
         val entries = readZipEntries(input)
         val contentXml = entries["content.xml"] ?: throw IOException("content.xml не найден — это не ODT")
 
-        val parser = XmlPullParserFactory.newInstance().newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
-        parser.setInput(ByteArrayInputStream(contentXml), null)
+        // Проход 1: автоматические стили
+        val styles = collectStyles(newParser(contentXml))
 
+        // Проход 2: тело документа
+        val bodyParser = newParser(contentXml)
         val out = StringBuilder()
         out.append(
             "<style>body{background:#fff;color:#161616;font-family:Georgia,'Times New Roman',serif;" +
@@ -48,13 +49,20 @@ object OdtToHtml {
                 "td,th{border:1px solid #9a9a9a;padding:4px 8px}img{max-width:100%;height:auto}</style>",
         )
 
-        while (parser.next() != XmlPullParser.END_DOCUMENT) {
-            if (parser.eventType == XmlPullParser.START_TAG && parser.name == "text" && parser.namespace == NS_OFFICE) {
-                renderChildren(parser, out, entries)
+        while (bodyParser.next() != XmlPullParser.END_DOCUMENT) {
+            if (bodyParser.eventType == XmlPullParser.START_TAG && bodyParser.name == "text" && bodyParser.namespace == NS_OFFICE) {
+                renderChildren(bodyParser, out, entries, styles)
                 break
             }
         }
         return out.toString()
+    }
+
+    private fun newParser(contentXml: ByteArray): XmlPullParser {
+        val parser = XmlPullParserFactory.newInstance().newPullParser()
+        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
+        parser.setInput(ByteArrayInputStream(contentXml), null)
+        return parser
     }
 
     private fun readZipEntries(input: InputStream): Map<String, ByteArray> {
@@ -75,10 +83,129 @@ object OdtToHtml {
         return result
     }
 
-    private fun renderChildren(parser: XmlPullParser, out: StringBuilder, entries: Map<String, ByteArray>) {
+    // ===== Стили =====
+
+    private data class OdtStyle(
+        val bold: Boolean? = null,
+        val italic: Boolean? = null,
+        val underline: Boolean? = null,
+        val color: String? = null,
+        val sizePt: String? = null,
+        val align: String? = null,
+        val parent: String? = null,
+    )
+
+    private fun collectStyles(parser: XmlPullParser): Map<String, OdtStyle> {
+        val styles = mutableMapOf<String, OdtStyle>()
+        var inAutoStyles = false
+        var currentName: String? = null
+        val props = mutableMapOf<String, String?>()
+
+        while (parser.next() != XmlPullParser.END_DOCUMENT) {
+            when (parser.eventType) {
+                XmlPullParser.START_TAG -> {
+                    when {
+                        parser.name == "automatic-styles" && parser.namespace == NS_OFFICE -> inAutoStyles = true
+
+                        inAutoStyles && parser.name == "style" && parser.namespace == NS_STYLE -> {
+                            currentName = parser.getAttributeValue(NS_STYLE, "name")
+                            props.clear()
+                            val parent = parser.getAttributeValue(NS_STYLE, "parent-style-name")
+                            if (parent != null) props["parent"] = parent
+                        }
+
+                        inAutoStyles && currentName != null &&
+                            (parser.name == "text-properties" || parser.name == "paragraph-properties") -> {
+                            for (i in 0 until parser.attributeCount) {
+                                val prefix = parser.getAttributePrefix(i)
+                                val name = parser.getAttributeName(i)
+                                val value = parser.getAttributeValue(i) ?: continue
+                                when {
+                                    prefix == "fo" && name == "font-weight" -> props["bold"] = value
+                                    prefix == "fo" && name == "font-style" -> props["italic"] = value
+                                    prefix == "fo" && name == "text-underline-style" ->
+                                        props["underline"] = if (value == "none") "false" else "true"
+                                    prefix == "fo" && name == "color" -> props["color"] = value
+                                    prefix == "fo" && name == "font-size" -> props["size"] = value
+                                    prefix == "fo" && name == "text-align" -> props["align"] = value
+                                }
+                            }
+                        }
+                    }
+                }
+
+                XmlPullParser.END_TAG -> {
+                    if (inAutoStyles && parser.name == "style" && parser.namespace == NS_STYLE) {
+                        val name = currentName
+                        if (name != null) {
+                            styles[name] = OdtStyle(
+                                bold = props["bold"]?.let { it == "bold" },
+                                italic = props["italic"]?.let { it == "italic" },
+                                underline = props["underline"]?.let { it == "true" },
+                                color = props["color"],
+                                sizePt = props["size"],
+                                align = props["align"],
+                                parent = props["parent"],
+                            )
+                        }
+                        currentName = null
+                        props.clear()
+                    } else if (parser.name == "automatic-styles" && parser.namespace == NS_OFFICE) {
+                        inAutoStyles = false
+                    }
+                }
+            }
+        }
+        return styles
+    }
+
+    /** Сливает свойства стиля с учётом цепочки parent-style-name. */
+    private fun resolveProps(styleName: String?, styles: Map<String, OdtStyle>, kind: PropKind): String? {
+        var name = styleName
+        val merged = mutableMapOf<String, String>()
+        var depth = 0
+        while (name != null && depth < 8) {
+            val style = styles[name] ?: break
+            fun take(key: String, value: String?) {
+                if (merged.containsKey(key)) return
+                value?.let { merged[key] = it }
+            }
+            when (kind) {
+                PropKind.TEXT -> {
+                    take("font-weight", style.bold?.let { if (it) "bold" else "normal" })
+                    take("font-style", style.italic?.let { if (it) "italic" else "normal" })
+                    take("text-decoration", style.underline?.let { if (it) "underline" else "none" })
+                    take("color", style.color)
+                    take("font-size", style.sizePt)
+                }
+                PropKind.PARAGRAPH -> {
+                    take("text-align", style.align)
+                    take("font-weight", style.bold?.let { if (it) "bold" else "normal" })
+                    take("font-style", style.italic?.let { if (it) "italic" else "normal" })
+                    take("color", style.color)
+                    take("font-size", style.sizePt)
+                }
+            }
+            name = style.parent
+            depth++
+        }
+        if (merged.isEmpty()) return null
+        return merged.entries.joinToString(";") { "${it.key}:${it.value}" }
+    }
+
+    private enum class PropKind { TEXT, PARAGRAPH }
+
+    // ===== Рендер тела =====
+
+    private fun renderChildren(
+        parser: XmlPullParser,
+        out: StringBuilder,
+        entries: Map<String, ByteArray>,
+        styles: Map<String, OdtStyle>,
+    ) {
         while (true) {
             when (parser.next()) {
-                XmlPullParser.START_TAG -> renderNode(parser, out, entries)
+                XmlPullParser.START_TAG -> renderNode(parser, out, entries, styles)
                 XmlPullParser.TEXT, XmlPullParser.CDSECT -> out.append(escape(parser.text))
                 XmlPullParser.END_TAG -> return
                 XmlPullParser.END_DOCUMENT -> return
@@ -86,55 +213,62 @@ object OdtToHtml {
         }
     }
 
-    private fun renderNode(parser: XmlPullParser, out: StringBuilder, entries: Map<String, ByteArray>) {
+    private fun renderNode(
+        parser: XmlPullParser,
+        out: StringBuilder,
+        entries: Map<String, ByteArray>,
+        styles: Map<String, OdtStyle>,
+    ) {
         val name = parser.name
         when {
             name == "h" && parser.namespace == NS_TEXT -> {
                 val level = (parser.getAttributeValue(NS_TEXT, "outline-level")?.toIntOrNull() ?: 1)
                     .coerceIn(1, 6)
-                out.append("<h$level>")
-                renderChildren(parser, out, entries)
+                val styleAttr = paragraphStyleAttr(parser, styles)
+                out.append("<h$level").append(styleAttr).append(">")
+                renderChildren(parser, out, entries, styles)
                 out.append("</h$level>")
             }
 
             name == "p" && parser.namespace == NS_TEXT -> {
-                out.append("<p>")
-                renderChildren(parser, out, entries)
+                val styleAttr = paragraphStyleAttr(parser, styles)
+                out.append("<p").append(styleAttr).append(">")
+                renderChildren(parser, out, entries, styles)
                 out.append("</p>")
             }
 
             name == "list" && parser.namespace == NS_TEXT -> {
                 out.append("<ul>")
-                renderChildren(parser, out, entries)
+                renderChildren(parser, out, entries, styles)
                 out.append("</ul>")
             }
 
             name == "list-item" && parser.namespace == NS_TEXT -> {
                 out.append("<li>")
-                renderChildren(parser, out, entries)
+                renderChildren(parser, out, entries, styles)
                 out.append("</li>")
             }
 
             name == "table" && parser.namespace == NS_TABLE -> {
                 out.append("<table>")
-                renderChildren(parser, out, entries)
+                renderChildren(parser, out, entries, styles)
                 out.append("</table>")
             }
 
             name == "table-row" && parser.namespace == NS_TABLE -> {
                 out.append("<tr>")
-                renderChildren(parser, out, entries)
+                renderChildren(parser, out, entries, styles)
                 out.append("</tr>")
             }
 
             name == "table-cell" && parser.namespace == NS_TABLE -> {
                 val span = parser.getAttributeValue(NS_TABLE, "number-columns-spanned")?.toIntOrNull()
                 out.append(if (span != null && span > 1) "<td colspan=\"$span\">" else "<td>")
-                renderChildren(parser, out, entries)
+                renderChildren(parser, out, entries, styles)
                 out.append("</td>")
             }
 
-            name == "image" && (parser.namespace.endsWith("drawing:1.0")) -> {
+            name == "image" && parser.namespace.endsWith("drawing:1.0") -> {
                 val href = parser.getAttributeValue(NS_XLINK, "href").orEmpty()
                 val bytes = entries[href]
                 if (bytes != null && bytes.size <= MAX_IMAGE_BYTES) {
@@ -153,15 +287,18 @@ object OdtToHtml {
             }
 
             name == "span" && parser.namespace == NS_TEXT -> {
-                out.append("<span>")
-                renderChildren(parser, out, entries)
+                val styleName = parser.getAttributeValue(NS_TEXT, "style-name")
+                val styleAttr = resolveProps(styleName, styles, PropKind.TEXT)
+                    ?.let { " style=\"$it\"" } ?: ""
+                out.append("<span").append(styleAttr).append(">")
+                renderChildren(parser, out, entries, styles)
                 out.append("</span>")
             }
 
             name == "a" && parser.namespace == NS_TEXT -> {
                 val href = parser.getAttributeValue(NS_XLINK, "href").orEmpty()
                 out.append("<a href=\"").append(escape(href)).append("\">")
-                renderChildren(parser, out, entries)
+                renderChildren(parser, out, entries, styles)
                 out.append("</a>")
             }
 
@@ -183,9 +320,13 @@ object OdtToHtml {
 
             name == "annotation" && parser.namespace == NS_OFFICE -> skipSubtree(parser)
 
-            else -> renderChildren(parser, out, entries)
+            else -> renderChildren(parser, out, entries, styles)
         }
     }
+
+    private fun paragraphStyleAttr(parser: XmlPullParser, styles: Map<String, OdtStyle>): String =
+        resolveProps(parser.getAttributeValue(NS_TEXT, "style-name"), styles, PropKind.PARAGRAPH)
+            ?.let { " style=\"$it\"" } ?: ""
 
     /** Просмотреть subtree, ничего не выводя (при текущем START_TAG). */
     private fun skipSubtree(parser: XmlPullParser) {
@@ -203,5 +344,4 @@ object OdtToHtml {
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
-        .replace("\"", "&quot;")
 }
