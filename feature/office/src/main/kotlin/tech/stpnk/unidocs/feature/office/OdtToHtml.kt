@@ -13,9 +13,12 @@ import java.util.Base64
 import java.util.zip.ZipInputStream
 
 /**
- * Конвертер ODT → HTML: заголовки, абзацы, списки, таблицы (вкл. colspan),
- * картинки (base64 ≤ 2 МБ) и ФОРМАТИРОВАНИЕ текста через автоматические стили
- * (жирный/курсив/подчёркивание/цвет/размер/выравнивание, наследование parent-style).
+ * Конвертер семейства OpenDocument → HTML:
+ * - odt (office:text): заголовки, абзацы, списки, таблицы (вкл. colspan), картинки (base64),
+ *   автоматические стили (жирный/курсив/подчёркивание/цвет/размер/выравнивание, parent-наследование);
+ * - ods (office:spreadsheet): таблицы;
+ * - odp/odg (office:presentation / office:drawing): страницы как разделы, текст и таблицы внутри;
+ * - flat-варианты fodt/fods/fodp/fodg: тот же XML без zip-контейнера.
  */
 object OdtToHtml {
 
@@ -25,6 +28,7 @@ object OdtToHtml {
     private val NS_OFFICE = "urn:oasis:names:tc:opendocument:xmlns:office:1.0"
     private val NS_TEXT = "urn:oasis:names:tc:opendocument:xmlns:text:1.0"
     private val NS_TABLE = "urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    private val NS_DRAWING = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
     private val NS_STYLE = "urn:oasis:names:tc:opendocument:xmlns:style:1.0"
     private val NS_XLINK = "http://www.w3.org/1999/xlink"
 
@@ -34,28 +38,27 @@ object OdtToHtml {
     }
 
     fun convertStream(input: InputStream): String {
-        val entries = readZipEntries(input)
-        val contentXml = entries["content.xml"] ?: throw IOException("content.xml не найден — это не ODT")
+        val head = input.readNBytes(4)
+        val rest = input.readBytes()
+        val full = head + rest
 
-        // Проход 1: автоматические стили
-        val styles = collectStyles(newParser(contentXml))
-
-        // Проход 2: тело документа
-        val bodyParser = newParser(contentXml)
-        val out = StringBuilder()
-        out.append(
-            "<style>body{background:#fff;color:#161616;font-family:Georgia,'Times New Roman',serif;" +
-                "line-height:1.55;margin:0;padding:16px}table{border-collapse:collapse;margin:8px 0}" +
-                "td,th{border:1px solid #9a9a9a;padding:4px 8px}img{max-width:100%;height:auto}</style>",
-        )
-
-        while (bodyParser.next() != XmlPullParser.END_DOCUMENT) {
-            if (bodyParser.eventType == XmlPullParser.START_TAG && bodyParser.name == "text" && bodyParser.namespace == NS_OFFICE) {
-                renderChildren(bodyParser, out, entries, styles)
-                break
-            }
+        return if (head.size >= 2 && head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()) {
+            // ZIP-контейнер (odt/ods/odp/odg)
+            val entries = readZipEntries(ByteArrayInputStream(full))
+            val contentXml = entries["content.xml"] ?: throw IOException("content.xml не найден — это не OpenDocument")
+            val styles = collectStyles(newParser(contentXml))
+            renderBody(newParser(contentXml), entries, styles)
+        } else {
+            // Flat ODF (fodt/fods/fodp/fodg): один XML без контейнера
+            if (!flatLooksLikeOdf(full)) throw IOException("Не похоже на OpenDocument (нет zip-магии PK и office:document)")
+            val styles = collectStyles(newParser(full))
+            renderBody(newParser(full), emptyMap(), styles)
         }
-        return out.toString()
+    }
+
+    private fun flatLooksLikeOdf(bytes: ByteArray): Boolean {
+        val head = String(bytes, 0, bytes.size.coerceAtMost(4096), Charsets.ISO_8859_1)
+        return head.contains("office:document")
     }
 
     private fun newParser(contentXml: ByteArray): XmlPullParser {
@@ -195,7 +198,69 @@ object OdtToHtml {
 
     private enum class PropKind { TEXT, PARAGRAPH }
 
-    // ===== Рендер тела =====
+    // ===== Тело документа =====
+
+    private fun htmlHeader(): String =
+        "<style>body{background:#fff;color:#161616;font-family:Georgia,'Times New Roman',serif;" +
+            "line-height:1.55;margin:0;padding:16px}table{border-collapse:collapse;margin:8px 0}" +
+            "td,th{border:1px solid #9a9a9a;padding:4px 8px}img{max-width:100%;height:auto}</style>"
+
+    /** Тело: ветвление по типу офисного документа. */
+    private fun renderBody(
+        parser: XmlPullParser,
+        entries: Map<String, ByteArray>,
+        styles: Map<String, OdtStyle>,
+    ): String {
+        val out = StringBuilder(htmlHeader())
+        while (parser.next() != XmlPullParser.END_DOCUMENT) {
+            if (parser.eventType == XmlPullParser.START_TAG && parser.namespace == NS_OFFICE) {
+                when (parser.name) {
+                    "text", "spreadsheet" -> {
+                        renderChildren(parser, out, entries, styles)
+                        return out.toString()
+                    }
+                    "presentation" -> {
+                        renderPages(parser, out, entries, styles, label = "Слайд")
+                        return out.toString()
+                    }
+                    "drawing" -> {
+                        renderPages(parser, out, entries, styles, label = "Страница")
+                        return out.toString()
+                    }
+                }
+            }
+        }
+        return out.toString()
+    }
+
+    /** odp/odg: каждая draw:page — раздел с заголовком. */
+    private fun renderPages(
+        parser: XmlPullParser,
+        out: StringBuilder,
+        entries: Map<String, ByteArray>,
+        styles: Map<String, OdtStyle>,
+        label: String,
+    ) {
+        var page = 0
+        while (true) {
+            when (parser.next()) {
+                XmlPullParser.START_TAG -> {
+                    if (parser.name == "page" && parser.namespace == NS_DRAWING) {
+                        page++
+                        val pageName = parser.getAttributeValue(NS_DRAWING, "name")
+                        out.append("<h2>")
+                        out.append(escape(if (pageName.isNullOrBlank()) "$label $page" else "$label $page — $pageName"))
+                        out.append("</h2>")
+                        renderChildren(parser, out, entries, styles)
+                    } else {
+                        skipSubtree(parser)
+                    }
+                }
+                XmlPullParser.END_TAG -> return
+                XmlPullParser.END_DOCUMENT -> return
+            }
+        }
+    }
 
     private fun renderChildren(
         parser: XmlPullParser,
@@ -268,7 +333,7 @@ object OdtToHtml {
                 out.append("</td>")
             }
 
-            name == "image" && parser.namespace.endsWith("drawing:1.0") -> {
+            name == "image" && parser.namespace == NS_DRAWING -> {
                 val href = parser.getAttributeValue(NS_XLINK, "href").orEmpty()
                 val bytes = entries[href]
                 if (bytes != null && bytes.size <= MAX_IMAGE_BYTES) {

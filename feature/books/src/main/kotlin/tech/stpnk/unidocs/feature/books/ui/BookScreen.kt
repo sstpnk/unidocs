@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -110,6 +112,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var pageReady by remember { mutableStateOf(false) }
     var opened by remember { mutableStateOf(false) }
+    var openError by remember { mutableStateOf<String?>(null) }
 
     var fraction by remember { mutableStateOf(0.0) }
     var pageLabel by remember { mutableStateOf("") }
@@ -263,6 +266,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
 
             override fun onError(message: String) {
                 report("Ошибка книги: $message")
+                main.post { openError = message }
             }
         })
     }
@@ -514,6 +518,32 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                 "reader.open('https://$ASSET_HOST/media/book.${session.format}')",
                 null,
             )
+        }
+    }
+
+    if (openError != null) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Ошибка книги",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    text = openError.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                TextButton(onClick = { openError = null }, modifier = Modifier.padding(top = 4.dp)) {
+                    Text("Скрыть")
+                }
+            }
         }
     }
 

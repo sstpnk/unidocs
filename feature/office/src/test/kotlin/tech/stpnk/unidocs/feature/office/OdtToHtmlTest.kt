@@ -157,4 +157,96 @@ class OdtToHtmlTest {
         assertTrue("нет цвета", html.contains("#c00000"))
         assertTrue("нет выравнивания", html.contains("text-align:center"))
     }
+
+    @Test
+    fun `odp pages render as sections`() {
+        val contentXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content
+                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+                xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0">
+              <office:body><office:presentation>
+                <draw:page draw:name="Титул"><text:p>Первый слайд</text:p></draw:page>
+                <draw:page draw:name="Вторая"><text:p>Содержание</text:p></draw:page>
+              </office:presentation></office:body>
+            </office:document-content>
+        """.trimIndent()
+        val bytes = ByteArrayOutputStream().use { out ->
+            ZipOutputStream(out).use { zip ->
+                zip.putNextEntry(ZipEntry("content.xml"))
+                zip.write(contentXml.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+            out.toByteArray()
+        }
+        val html = OdtToHtml.convertStream(ByteArrayInputStream(bytes))
+        assertTrue("нет заголовка слайда 1", html.contains("Слайд 1 — Титул"))
+        assertTrue("нет заголовка слайда 2", html.contains("Слайд 2 — Вторая"))
+        assertTrue("нет текста слайда 1", html.contains("Первый слайд"))
+        assertTrue("нет текста слайда 2", html.contains("Содержание"))
+    }
+
+    @Test
+    fun `flat fodt renders without zip`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document
+                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+                xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+                xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+                office:mimetype="application/vnd.oasis.opendocument.text">
+              <office:automatic-styles>
+                <style:style style:name="T1" style:family="text">
+                  <style:text-properties fo:font-weight="bold"/>
+                </style:style>
+              </office:automatic-styles>
+              <office:body><office:text>
+                <text:p>Плоский <text:span text:style-name="T1">документ</text:span></text:p>
+              </office:text></office:body>
+            </office:document>
+        """.trimIndent()
+        val html = OdtToHtml.convertStream(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)))
+        assertTrue("нет текста", html.contains("Плоский"))
+        assertTrue("нет bold", html.contains("font-weight:bold"))
+        assertTrue("нет слова", html.contains("документ"))
+    }
+
+    @Test
+    fun `ods spreadsheet renders tables`() {
+        val contentXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content
+                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+                xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+              <office:body><office:spreadsheet>
+                <table:table table:name="Данные">
+                  <table:table-row>
+                    <table:table-cell><text:p>Месяц</text:p></table:table-cell>
+                    <table:table-cell><text:p>Сумма</text:p></table:table-cell>
+                  </table:table-row>
+                  <table:table-row>
+                    <table:table-cell><text:p>Март</text:p></table:table-cell>
+                    <table:table-cell><text:p>100</text:p></table:table-cell>
+                  </table:table-row>
+                </table:table>
+              </office:spreadsheet></office:body>
+            </office:document-content>
+        """.trimIndent()
+        val bytes = ByteArrayOutputStream().use { out ->
+            ZipOutputStream(out).use { zip ->
+                zip.putNextEntry(ZipEntry("content.xml"))
+                zip.write(contentXml.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+            out.toByteArray()
+        }
+        val html = OdtToHtml.convertStream(ByteArrayInputStream(bytes))
+        assertTrue("нет таблицы", html.contains("<table>"))
+        assertTrue("нет ячейки", html.contains("<td>"))
+        assertTrue("нет данных", html.contains("Март") && html.contains("100"))
+    }
+
 }

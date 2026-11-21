@@ -38,7 +38,7 @@ class OfficeMatcherTest {
     @Test
     fun `odt and ods by extension`() {
         assertEquals("odt", OfficeMatcher.typeFor(null, "заявление.odt", ByteSequence(ByteArray(0))))
-        assertEquals("xlsx", OfficeMatcher.typeFor(null, "таблица.ods", ByteSequence(ByteArray(0))))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "таблица.ods", ByteSequence(ByteArray(0))))
     }
 
     @Test
@@ -78,4 +78,19 @@ class OfficeMatcherTest {
         assertFalse(OfficeMatcher.supports("text/plain", "notes.txt", ByteSequence("привет".toByteArray())))
         assertTrue(OfficeMatcher.supports(null, "report.xlsx", ByteSequence(ByteArray(0))))
     }
+
+    @Test
+    fun `odf family routes to own converter`() {
+        val head = ByteSequence(ByteArray(4) { 0 })
+        assertEquals("odt", OfficeMatcher.typeFor(null, "презентация.odp", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "чертёж.odg", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "таблица.ods", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "документ.fodt", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "таблица.fods", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "слайды.fodp", head))
+        assertEquals("odt", OfficeMatcher.typeFor("application/vnd.oasis.opendocument.presentation", "файл", head))
+        assertEquals("odt", OfficeMatcher.typeFor("application/vnd.oasis.opendocument.graphics", "файл", head))
+        assertEquals("odt", OfficeMatcher.typeFor("application/vnd.oasis.opendocument.text-flat-xml", "файл", head))
+    }
+
 }

@@ -71,4 +71,14 @@ class RtfToHtmlTest {
         val result = runCatching { RtfToHtml.convert("не rtf".toByteArray()) }
         assertTrue(result.isFailure)
     }
+
+    @Test
+    fun `fonttbl and colortbl without star are skipped`() {
+        val body = "{\\fonttbl{\\f0 Arial;}}{\\colortbl;\\red255\\green0\\blue0;}текст после служебных таблиц"
+        val html = RtfToHtml.convert(rtf(body))
+        assertTrue("текст потерян", html.contains("текст после служебных таблиц"))
+        assertFalse("fonttbl попал в вывод", html.contains("Arial"))
+        assertFalse("colortbl попал в вывод", html.contains("red255"))
+    }
+
 }

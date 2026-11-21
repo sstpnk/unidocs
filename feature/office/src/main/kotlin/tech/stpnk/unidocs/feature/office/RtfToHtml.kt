@@ -12,6 +12,18 @@ import java.nio.charset.Charset
  */
 object RtfToHtml {
 
+    /** Известные destination-группы RTF — служебные структуры, не текст документа. */
+    private val DESTINATIONS = setOf(
+        "fonttbl", "colortbl", "stylesheet", "info", "pict", "object", "mmathPr",
+        "header", "footer", "headerl", "headerr", "headerf", "footerl", "footerr", "footerf",
+        "footnote", "annotation", "xfilt", "xmlnstbl", "themedata", "colorschememapping",
+        "datastore", "latentstyles", "listtable", "listoverridetable", "rsidtbl", "generator",
+        "filetbl", "revtbl", "pgptbl", "pgdsctbl", "wgrffmtfilter", "fldinst", "formfield",
+        "do", "bkmkstart", "bkmkend", "shpinst", "nonshppict", "defchp", "defpap", "pn",
+        "pnseclvl", "passwordhash", "upr", "ud", "private", "objdata", "objclass", "objname",
+        "rslt", "genobj", "sn", "sv", "falt", "result", "wfonts", "pntext", "do", "object",
+    )
+
     private const val MAX_INPUT = 32L * 1024 * 1024
 
     fun convert(bytes: ByteArray): String = convertStream(ByteArrayInputStream(bytes))
@@ -152,7 +164,26 @@ object RtfToHtml {
                     index += ucSkip.coerceAtLeast(0)
                 }
                 "uc" -> param?.let { ucSkip = it }
-                else -> Unit
+                "emdash" -> { flushPendingBytes(); pending.append('\u2014') }
+                "endash" -> { flushPendingBytes(); pending.append('\u2013') }
+                "lquote" -> { flushPendingBytes(); pending.append('\u2018') }
+                "rquote" -> { flushPendingBytes(); pending.append('\u2019') }
+                "ldblquote" -> { flushPendingBytes(); pending.append('\u201C') }
+                "rdblquote" -> { flushPendingBytes(); pending.append('\u201D') }
+                "bullet" -> { flushPendingBytes(); pending.append('\u2022') }
+                "~" -> { flushPendingBytes(); pending.append('\u00A0') }
+                "_" -> { flushPendingBytes(); pending.append('-') }
+                else -> {
+                    // Destination-группа без \*: fonttbl/colortbl/info и т.п. —
+                    // содержимое пропускаем, чтобы не выдавать артефакты.
+                    if (word in DESTINATIONS) {
+                        skipDepth = 1
+                        if (openP) {
+                            closeParagraph()
+                            openParagraph()
+                        }
+                    }
+                }
             }
         }
 

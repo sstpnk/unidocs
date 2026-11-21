@@ -110,8 +110,33 @@ view.addEventListener('relocate', e => {
 window.reader = {
     async open(url) {
         try {
+            let input = url
+            // FB2 часто в cp1251/koi8 и с BOM: foliate тогда показывает кракозябры
+            // или падает молча. Декодируем сами и отдаём foliate чистый UTF-8.
+            try {
+                const res = await fetch(url)
+                if (res.ok) {
+                    const buf = await res.arrayBuffer()
+                    const head = new Uint8Array(buf, 0, Math.min(4, buf.byteLength))
+                    const isZip = head[0] === 0x50 && head[1] === 0x4B
+                    const isPdf = head[0] === 0x25 && head[1] === 0x50
+                    if (!isZip && !isPdf && /\.(fb2|fbz)$/i.test(url)) {
+                        let text = new TextDecoder('utf-8').decode(buf)
+                        const enc = text.match(/^\uFEFF?\s*<\?xml\s+version\s*=\s*["']1\.\d+["']\s+encoding\s*=\s*["']([A-Za-z0-9._-]+)["']/i)?.[1]
+                        if (enc && enc.toLowerCase() !== 'utf-8' && enc.toLowerCase() !== 'utf8') {
+                            try { text = new TextDecoder(enc).decode(buf) } catch (e) { /* незнакомая метка — как есть */ }
+                        }
+                        text = text.replace(/^\uFEFF/, '')
+                        // Объявление переписываем на utf-8: foliate декодирует повторно по нему
+                        text = text.replace(/^(\s*<\?xml\s+version\s*=\s*["']1\.\d+["']\s+encoding\s*=\s*)["'][^"']+["']/i, '$1"utf-8"')
+                        input = new File([new TextEncoder().encode(text)], 'book.fb2', { type: 'application/x-fictionbook+xml' })
+                    }
+                }
+            } catch (e) { console.error('fb2 preopen:', e) }
             // ВАЖНО: view.open() не возвращает книгу — она попадает в view.book
-            await view.open(url)
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Книга не открылась (таймаут)')), 25000))
+            await Promise.race([view.open(input), timeout])
             const book = view.book
             if (!book) throw new Error('Книга не открылась (view.book пуст)')
             applyStyle()
