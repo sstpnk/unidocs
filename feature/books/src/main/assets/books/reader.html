@@ -110,7 +110,10 @@ view.addEventListener('relocate', e => {
 window.reader = {
     async open(url) {
         try {
-            const book = await view.open(url)
+            // ВАЖНО: view.open() не возвращает книгу — она попадает в view.book
+            await view.open(url)
+            const book = view.book
+            if (!book) throw new Error('Книга не открылась (view.book пуст)')
             applyStyle()
             if (book.toc) {
                 const flat = []

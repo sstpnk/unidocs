@@ -105,10 +105,12 @@ fun MarkdownScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            ModeChips(current = mode, onSelect = { mode = it })
+            if (!session.plainText) {
+                ModeChips(current = mode, onSelect = { mode = it })
+            }
 
-            when (mode) {
-                ViewMode.EDIT -> EditorPane(
+            when {
+                session.plainText -> EditorPane(
                     value = editorValue,
                     onChange = {
                         editorValue = it
@@ -116,9 +118,17 @@ fun MarkdownScreen(
                     },
                 )
 
-                ViewMode.PREVIEW -> PreviewPane(blocks)
+                mode == ViewMode.EDIT -> EditorPane(
+                    value = editorValue,
+                    onChange = {
+                        editorValue = it
+                        session.updateText(it.text)
+                    },
+                )
 
-                ViewMode.SPLIT -> Row(modifier = Modifier.fillMaxSize()) {
+                mode == ViewMode.PREVIEW -> PreviewPane(blocks)
+
+                mode == ViewMode.SPLIT -> Row(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                         EditorPane(
                             value = editorValue,

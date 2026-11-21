@@ -16,7 +16,7 @@
   #content { padding-bottom: 24px; }
 </style>
 <script src="./vendor/jquery.min.js"></script>
-<script src="./vendor/jszip2.min.js"></script>
+<script src="./vendor/jszip.min.js"></script>
 <script src="./vendor/filereader.js"></script>
 <script src="./vendor/d3.min.js"></script>
 <script src="./vendor/nv.d3.min.js"></script>
@@ -87,6 +87,11 @@
       done();
     },
     odt: async function () {
+      var html = await (await fetch(src)).text();
+      content.innerHTML = html;
+      done();
+    },
+    rtf: async function () {
       var html = await (await fetch(src)).text();
       content.innerHTML = html;
       done();

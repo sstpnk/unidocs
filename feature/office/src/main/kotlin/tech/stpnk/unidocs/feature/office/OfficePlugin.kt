@@ -10,7 +10,7 @@ import java.io.IOException
 
 /**
  * Плагин офисных форматов: docx/xlsx/pptx через JS-движки в изолированном WebView,
- * odt/ods — через собственный конвертер / SheetJS.
+ * odt/ods/rtf — через собственные конвертеры (RtfToHtml / OdtToHtml).
  */
 class OfficePlugin(private val appContext: Context) : tech.stpnk.unidocs.core.model.DocumentPlugin {
 
@@ -25,16 +25,20 @@ class OfficePlugin(private val appContext: Context) : tech.stpnk.unidocs.core.mo
         val type = OfficeMatcher.typeFor(context.mimeType, context.displayName, head)
             ?: throw IOException("Не удалось определить формат офисного документа")
 
-        // ODT конвертируется в HTML заранее (файл в кэше отдаётся через /media/odt.html)
+        // Конвертируемые форматы (odt/rtf) заранее превращаем в HTML в кэше
         var mediaUri = context.uri
-        var mediaName = "office.${type}"
+        var mediaName = "office.$type"
         if (type == "odt") {
             val html = OdtToHtml.convert(appContext, Uri.parse(context.uri))
-            val dir = File(appContext.cacheDir, "office").apply { mkdirs() }
-            val outFile = File(dir, "odt-${System.currentTimeMillis()}.html")
-            outFile.writeText(html, Charsets.UTF_8)
+            val outFile = cacheHtml("odt", html)
             mediaUri = Uri.fromFile(outFile).toString()
             mediaName = "odt.html"
+        } else if (type == "rtf") {
+            val bytes = tech.stpnk.unidocs.core.storage.SafFiles.readAll(appContext, Uri.parse(context.uri))
+            val html = RtfToHtml.convert(bytes)
+            val outFile = cacheHtml("rtf", html)
+            mediaUri = Uri.fromFile(outFile).toString()
+            mediaName = "rtf.html"
         }
 
         return OfficeSession(
@@ -44,5 +48,12 @@ class OfficePlugin(private val appContext: Context) : tech.stpnk.unidocs.core.mo
             mediaUri = mediaUri,
             mediaName = mediaName,
         )
+    }
+
+    private fun cacheHtml(prefix: String, html: String): File {
+        val dir = File(appContext.cacheDir, "office").apply { mkdirs() }
+        return File(dir, "$prefix-${System.currentTimeMillis()}.html").apply {
+            writeText(html, Charsets.UTF_8)
+        }
     }
 }

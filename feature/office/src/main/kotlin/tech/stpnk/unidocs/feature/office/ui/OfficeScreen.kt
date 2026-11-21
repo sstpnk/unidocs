@@ -58,7 +58,7 @@ fun OfficeScreen(session: OfficeSession, onBack: () -> Unit) {
     val mediaHandler = remember(session) {
         WebViewAssetLoader.PathHandler { path ->
             runCatching {
-                val stream: InputStream = if (session.officeType == "odt") {
+                val stream: InputStream = if (session.officeType == "odt" || session.officeType == "rtf") {
                     val filePath = Uri.parse(session.mediaUri).path
                         ?: return@PathHandler null
                     File(filePath).inputStream()
@@ -69,7 +69,7 @@ fun OfficeScreen(session: OfficeSession, onBack: () -> Unit) {
                     "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    "odt" -> "text/html"
+                    "odt", "rtf" -> "text/html"
                     else -> "application/octet-stream"
                 }
                 WebResourceResponse(mime, if (session.officeType == "odt") "utf-8" else null, stream)

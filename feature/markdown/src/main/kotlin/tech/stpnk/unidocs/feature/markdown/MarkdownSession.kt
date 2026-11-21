@@ -32,6 +32,8 @@ class MarkdownSession(
     private val openContext: OpenContext,
     initialText: String,
     appContext: Context,
+    /** true — файл простого текста (txt/log/csv): режимы и парсинг отключены. */
+    val plainText: Boolean = false,
 ) : DocumentSession {
 
     private val resolver = appContext.contentResolver

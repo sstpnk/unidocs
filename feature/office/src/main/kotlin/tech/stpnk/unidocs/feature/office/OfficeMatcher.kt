@@ -12,15 +12,20 @@ object OfficeMatcher {
         "application/vnd.openxmlformats-officedocument.presentationml.presentation" to "pptx",
         "application/vnd.oasis.opendocument.text" to "odt",
         "application/vnd.oasis.opendocument.spreadsheet" to "xlsx",
+        "application/vnd.ms-excel" to "xlsx",
+        "application/rtf" to "rtf",
+        "text/rtf" to "rtf",
     )
 
     private val extensionToType = mapOf(
         "docx" to "docx",
         "xlsx" to "xlsx",
         "xlsm" to "xlsx",
+        "xls" to "xlsx",
         "pptx" to "pptx",
         "odt" to "odt",
         "ods" to "xlsx",
+        "rtf" to "rtf",
     )
 
     fun typeFor(mimeType: String?, displayName: String, head: ByteSequence): String? {

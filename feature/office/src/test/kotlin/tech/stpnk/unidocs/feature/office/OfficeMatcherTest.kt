@@ -54,6 +54,20 @@ class OfficeMatcherTest {
     }
 
     @Test
+    fun `xls legacy routes to xlsx renderer`() {
+        val head = ByteSequence(ByteArray(0))
+        assertEquals("xlsx", OfficeMatcher.typeFor(null, "таблица.xls", head))
+        assertEquals("xlsx", OfficeMatcher.typeFor("application/vnd.ms-excel", "таблица", head))
+    }
+
+    @Test
+    fun `rtf routes to rtf converter`() {
+        val head = ByteSequence(ByteArray(0))
+        assertEquals("rtf", OfficeMatcher.typeFor(null, "записка.rtf", head))
+        assertEquals("rtf", OfficeMatcher.typeFor("application/rtf", "записка", head))
+    }
+
+    @Test
     fun `legacy doc is not supported`() {
         assertNull(OfficeMatcher.typeFor("application/msword", "старый.doc", ByteSequence(ByteArray(0))))
         assertFalse(OfficeMatcher.supports("application/msword", "старый.doc", ByteSequence(ByteArray(0))))
