@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +63,13 @@ class MainActivity : ComponentActivity() {
                 val viewModel: DocumentsViewModel = viewModel()
                 val session by viewModel.session.collectAsState()
                 val current = session
+
+                // Системная «Назад» всегда возвращает из открытого документа
+                // к списку файлов. Экраны с несохранёнными правками (Markdown)
+                // регистрируют свой BackHandler позже и показывают предупреждение.
+                BackHandler(enabled = current != null) {
+                    viewModel.closeSession()
+                }
 
                 when {
                     current == null -> DocumentsScreen(viewModel = viewModel)

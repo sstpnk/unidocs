@@ -22,6 +22,13 @@ object OfficeMatcher {
         "application/rtf" to "rtf",
         "text/rtf" to "rtf",
         "application/msword" to "doc",
+        "application/vnd.ms-powerpoint" to "ppt",
+        "text/html" to "html",
+        "application/xhtml+xml" to "html",
+        "multipart/related" to "mhtml",
+        "message/rfc822" to "eml",
+        "text/calendar" to "ics",
+        "text/csv" to "csv",
     )
 
     private val extensionToType = mapOf(
@@ -38,8 +45,28 @@ object OfficeMatcher {
         "fods" to "odt",
         "fodp" to "odt",
         "fodg" to "odt",
+        // MyOffice использует совместимый ODF-контейнер с другим расширением.
+        "xodt" to "odt",
+        "xods" to "odt",
+        "xodp" to "odt",
         "rtf" to "rtf",
         "doc" to "doc",
+        "ppt" to "ppt",
+        "html" to "html",
+        "htm" to "html",
+        "mhtml" to "mhtml",
+        "mht" to "mhtml",
+        "csv" to "csv",
+        "eml" to "eml",
+        "ics" to "ics",
+        "xmind" to "xmind",
+        "xboard" to "xmind",
+        // iWork хранит документ в IWA, но кладёт внутрь preview.jpg.
+        "pages" to "iwork",
+        "numbers" to "iwork",
+        "numbes" to "iwork",
+        "key" to "iwork",
+        "keynote" to "iwork",
     )
 
     fun typeFor(mimeType: String?, displayName: String, head: ByteSequence): String? {

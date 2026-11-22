@@ -79,6 +79,9 @@ class OfficeMatcherTest {
         assertEquals("odt", OfficeMatcher.typeFor("application/vnd.oasis.opendocument.presentation", "файл", head))
         assertEquals("odt", OfficeMatcher.typeFor("application/vnd.oasis.opendocument.graphics", "файл", head))
         assertEquals("odt", OfficeMatcher.typeFor("application/vnd.oasis.opendocument.text-flat-xml", "файл", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "письмо.xodt", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "таблица.xods", head))
+        assertEquals("odt", OfficeMatcher.typeFor(null, "слайды.xodp", head))
     }
 
     @Test
@@ -95,5 +98,21 @@ class OfficeMatcherTest {
         val head = ByteSequence(ByteArray(0))
         assertNull(OfficeMatcher.typeFor(null, "archive.zip", head))
         assertNull(OfficeMatcher.typeFor("application/zip", "файл", head))
+    }
+
+    @Test
+    fun `interchange and archive preview formats route to a renderer`() {
+        val head = ByteSequence(ByteArray(0))
+        assertEquals("html", OfficeMatcher.typeFor(null, "страница.html", head))
+        assertEquals("mhtml", OfficeMatcher.typeFor(null, "архив.mht", head))
+        assertEquals("eml", OfficeMatcher.typeFor(null, "письмо.eml", head))
+        assertEquals("ics", OfficeMatcher.typeFor(null, "календарь.ics", head))
+        assertEquals("csv", OfficeMatcher.typeFor(null, "данные.csv", head))
+        assertEquals("xmind", OfficeMatcher.typeFor(null, "карта.xmind", head))
+        assertEquals("xmind", OfficeMatcher.typeFor(null, "доска.xboard", head))
+        assertEquals("iwork", OfficeMatcher.typeFor(null, "лист.numbers", head))
+        assertEquals("iwork", OfficeMatcher.typeFor(null, "документ.pages", head))
+        assertEquals("iwork", OfficeMatcher.typeFor(null, "слайды.key", head))
+        assertEquals("ppt", OfficeMatcher.typeFor(null, "архив.ppt", head))
     }
 }

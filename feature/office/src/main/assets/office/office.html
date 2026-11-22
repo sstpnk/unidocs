@@ -11,7 +11,14 @@
   .sheetbtn { display: inline-block; padding: 8px 14px; color: #fff; cursor: pointer; font-size: 13px; }
   .sheetbtn.active { background: #fff; color: #217346; font-weight: 600; }
   .docpage { background: #fff; margin: 12px auto; max-width: 900px; box-shadow: 0 1px 5px rgba(0,0,0,.28); overflow-x: auto; }
-  .docpage table { border-collapse: collapse; }
+  .docpage table, #content table { border-collapse: collapse; }
+  .docpage td, .docpage th, #content td, #content th { border: 1px solid #a0a0a0; padding: 4px 8px; vertical-align: top; }
+  .docpage img, #content img { max-width: 100%; height: auto; }
+  .docx-wrapper { background: #fff; margin: 12px auto; padding: 16px; max-width: 900px; box-shadow: 0 1px 5px rgba(0,0,0,.28); }
+  .source { white-space: pre-wrap; overflow-wrap: anywhere; background: #fff; margin: 12px; padding: 16px; }
+  .mail, .calendar, .mind { background: #fff; margin: 12px auto; padding: 16px; max-width: 900px; box-shadow: 0 1px 5px rgba(0,0,0,.28); }
+  .calendar dt { font-weight: 600; margin-top: 10px; }
+  .mind ul { padding-left: 22px; }
   .err { color: #b00020; padding: 16px; font-size: 14px; }
   #content { padding-bottom: 24px; }
 </style>
@@ -50,6 +57,173 @@
     if (bridge) bridge.onRendered();
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  async function fetchText() {
+    return (await fetch(src)).text();
+  }
+
+  // User HTML is shown as a document, not run as application code. Network
+  // requests are additionally blocked by the isolated WebView host.
+  function safeHtml(raw) {
+    var doc = new DOMParser().parseFromString(raw, 'text/html');
+    doc.querySelectorAll('script,iframe,object,embed,base,form').forEach(function (node) { node.remove(); });
+    doc.querySelectorAll('*').forEach(function (node) {
+      Array.prototype.slice.call(node.attributes).forEach(function (attr) {
+        if (/^on/i.test(attr.name) || (/^(href|src)$/i.test(attr.name) && /^\s*(javascript|vbscript):/i.test(attr.value))) {
+          node.removeAttribute(attr.name);
+        }
+      });
+    });
+    var styles = Array.prototype.map.call(doc.head.querySelectorAll('style'), function (style) { return style.outerHTML; }).join('');
+    return styles + doc.body.innerHTML;
+  }
+
+  function decodeQuotedPrintable(value) {
+    return value.replace(/=\r?\n/g, '').replace(/=([0-9a-f]{2})/gi, function (_, hex) {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+  }
+
+  function decodeMimeBody(body, headers) {
+    var encoding = (headers['content-transfer-encoding'] || '').toLowerCase();
+    if (encoding.indexOf('base64') >= 0) {
+      try { return decodeURIComponent(Array.prototype.map.call(atob(body.replace(/\s/g, '')), function (c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); } catch (_) { return atob(body.replace(/\s/g, '')); }
+    }
+    return encoding.indexOf('quoted-printable') >= 0 ? decodeQuotedPrintable(body) : body;
+  }
+
+  function parseHeaders(raw) {
+    var headers = {};
+    raw.replace(/\r?\n[ \t]+/g, ' ').split(/\r?\n/).forEach(function (line) {
+      var pivot = line.indexOf(':');
+      if (pivot > 0) headers[line.slice(0, pivot).toLowerCase()] = line.slice(pivot + 1).trim();
+    });
+    return headers;
+  }
+
+  function extractMime(raw, wanted) {
+    var split = raw.search(/\r?\n\r?\n/);
+    var headerText = split >= 0 ? raw.slice(0, split) : raw;
+    var headers = parseHeaders(headerText);
+    var body = split >= 0 ? raw.slice(split).replace(/^\r?\n\r?\n/, '') : '';
+    var boundary = (headers['content-type'] || '').match(/boundary\s*=\s*"?([^";\r\n]+)/i);
+    if (!boundary) return { headers: headers, body: decodeMimeBody(body, headers) };
+    var parts = body.split(new RegExp('--' + boundary[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:--)?\\s*(?:\\r?\\n)?'));
+    for (var i = 0; i < parts.length; i++) {
+      var part = extractMime(parts[i], wanted);
+      var contentType = (part.headers['content-type'] || '').toLowerCase();
+      if (contentType.indexOf(wanted) >= 0) return part;
+    }
+    return { headers: headers, body: body };
+  }
+
+  function parseCsv(text) {
+    var delimiter = [';', '\t', ','].reduce(function (best, candidate) {
+      return text.split(/\r?\n/, 4).join('\n').split(candidate).length > text.split(/\r?\n/, 4).join('\n').split(best).length ? candidate : best;
+    }, ';');
+    var rows = [], row = [], field = '', quoted = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (ch === '"') { if (quoted && text[i + 1] === '"') { field += ch; i++; } else quoted = !quoted; }
+      else if (!quoted && ch === delimiter) { row.push(field); field = ''; }
+      else if (!quoted && (ch === '\n' || ch === '\r')) { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(field); rows.push(row.splice(0)); field = ''; }
+      else field += ch;
+    }
+    if (field || row.length) { row.push(field); rows.push(row); }
+    return { delimiter: delimiter, rows: rows };
+  }
+
+  function renderCsv(text) {
+    var parsed = parseCsv(text);
+    var page = document.createElement('div'); page.className = 'docpage';
+    var caption = document.createElement('p'); caption.textContent = 'Разделитель: ' + (parsed.delimiter === '\t' ? 'табуляция' : parsed.delimiter); page.appendChild(caption);
+    var table = document.createElement('table');
+    parsed.rows.forEach(function (cells, index) {
+      var tr = document.createElement('tr');
+      cells.forEach(function (cell) { var td = document.createElement(index === 0 ? 'th' : 'td'); td.textContent = cell; tr.appendChild(td); });
+      table.appendChild(tr);
+    });
+    page.appendChild(table); content.appendChild(page);
+    var raw = document.createElement('pre'); raw.className = 'source'; raw.textContent = text;
+    var toggle = document.createElement('button'); toggle.textContent = 'Показать как текст';
+    toggle.onclick = function () { var isRaw = raw.parentNode; if (isRaw) { raw.remove(); page.style.display = ''; toggle.textContent = 'Показать как текст'; } else { page.style.display = 'none'; content.appendChild(raw); toggle.textContent = 'Показать как таблицу'; } };
+    content.insertBefore(toggle, page);
+  }
+
+  function topicTree(topic) {
+    var item = document.createElement('li'); item.textContent = (topic && (topic.title || topic.text)) || 'Тема';
+    var children = topic && topic.children && (topic.children.attached || topic.children.detached);
+    if (children && children.length) { var list = document.createElement('ul'); children.forEach(function (child) { list.appendChild(topicTree(child)); }); item.appendChild(list); }
+    return item;
+  }
+
+  function cssColor(color) {
+    if (!color) return '';
+    if (color.rgb) return '#' + String(color.rgb).replace(/^FF/i, '');
+    return '';
+  }
+
+  function xlsxCellCss(workbook, cell) {
+    var style = cell && cell.s;
+    if (typeof style === 'number' && workbook.Styles && workbook.Styles.CellXf) style = workbook.Styles.CellXf[style];
+    if (!style || typeof style !== 'object') return '';
+    var fonts = workbook.Styles && workbook.Styles.Fonts || [];
+    var fills = workbook.Styles && workbook.Styles.Fills || [];
+    var borders = workbook.Styles && workbook.Styles.Borders || [];
+    var font = style.font || fonts[style.fontId] || {};
+    var fill = style.fill || fills[style.fillId] || {};
+    var border = style.border || borders[style.borderId] || {};
+    var alignment = style.alignment || {};
+    var css = [];
+    if (font.bold || font.b) css.push('font-weight:bold');
+    if (font.italic || font.i) css.push('font-style:italic');
+    if (font.underline || font.u) css.push('text-decoration:underline');
+    if (font.sz) css.push('font-size:' + font.sz + 'pt');
+    if (font.name) css.push('font-family:' + JSON.stringify(font.name));
+    var fontColor = cssColor(font.color); if (fontColor) css.push('color:' + fontColor);
+    var fillColor = cssColor(fill.fgColor || fill.bgColor); if (fillColor) css.push('background-color:' + fillColor);
+    if (alignment.horizontal) css.push('text-align:' + alignment.horizontal);
+    if (alignment.vertical) css.push('vertical-align:' + alignment.vertical);
+    if (alignment.wrapText || alignment.wrap) css.push('white-space:pre-wrap');
+    ['left', 'right', 'top', 'bottom'].forEach(function (edge) {
+      var side = border[edge] || {}; if (side.style) css.push('border-' + edge + ':1px solid ' + (cssColor(side.color) || '#555'));
+    });
+    return css.join(';');
+  }
+
+  function xlsxTable(workbook, sheet) {
+    var range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    var merges = sheet['!merges'] || [];
+    var merged = {};
+    merges.forEach(function (merge) {
+      for (var row = merge.s.r; row <= merge.e.r; row++) for (var col = merge.s.c; col <= merge.e.c; col++) {
+        if (row !== merge.s.r || col !== merge.s.c) merged[row + ':' + col] = true;
+      }
+    });
+    var table = document.createElement('table');
+    var maxCells = 10000;
+    for (var r = range.s.r; r <= range.e.r && maxCells > 0; r++) {
+      var tr = document.createElement('tr');
+      for (var c = range.s.c; c <= range.e.c && maxCells > 0; c++, maxCells--) {
+        if (merged[r + ':' + c]) continue;
+        var address = XLSX.utils.encode_cell({ r: r, c: c });
+        var cell = sheet[address] || {};
+        var td = document.createElement(r === range.s.r ? 'th' : 'td');
+        var merge = merges.find(function (item) { return item.s.r === r && item.s.c === c; });
+        if (merge) { td.rowSpan = merge.e.r - merge.s.r + 1; td.colSpan = merge.e.c - merge.s.c + 1; }
+        td.textContent = cell.w != null ? cell.w : (cell.v != null ? String(cell.v) : '');
+        var css = xlsxCellCss(workbook, cell); if (css) td.style.cssText = css;
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    return table;
+  }
+
   var renderers = {
     docx: async function () {
       var buffer = await (await fetch(src)).arrayBuffer();
@@ -58,7 +232,7 @@
     },
     xlsx: async function () {
       var buffer = new Uint8Array(await (await fetch(src)).arrayBuffer());
-      var workbook = XLSX.read(buffer, { type: 'array' });
+      var workbook = XLSX.read(buffer, { type: 'array', cellStyles: true, cellNF: true });
       var bar = document.getElementById('sheetbar');
       bar.style.display = 'block';
       workbook.SheetNames.forEach(function (name, index) {
@@ -77,7 +251,7 @@
         var sheetPage = document.createElement('div');
         sheetPage.className = 'docpage';
         sheetPage.style.display = index === 0 ? 'block' : 'none';
-        sheetPage.innerHTML = XLSX.utils.sheet_to_html(workbook.Sheets[name], { editable: false });
+        sheetPage.appendChild(xlsxTable(workbook, workbook.Sheets[name]));
         content.appendChild(sheetPage);
       });
       done();
@@ -95,6 +269,61 @@
       var html = await (await fetch(src)).text();
       content.innerHTML = html;
       done();
+    },
+    html: async function () {
+      content.innerHTML = safeHtml(await fetchText());
+      done();
+    },
+    mhtml: async function () {
+      var part = extractMime(await fetchText(), 'text/html');
+      content.innerHTML = safeHtml(part.body || '<p>HTML-часть MHTML не найдена.</p>');
+      done();
+    },
+    eml: async function () {
+      var part = extractMime(await fetchText(), 'text/html');
+      var page = document.createElement('article'); page.className = 'mail';
+      var from = part.headers.from || ''; var to = part.headers.to || ''; var subject = part.headers.subject || '';
+      page.innerHTML = '<h2>' + escapeHtml(subject) + '</h2><p><b>От:</b> ' + escapeHtml(from) + '<br><b>Кому:</b> ' + escapeHtml(to) + '</p>' + safeHtml(part.body || '');
+      content.appendChild(page); done();
+    },
+    ics: async function () {
+      var raw = (await fetchText()).replace(/\r?\n[ \t]/g, '');
+      var events = raw.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) || [];
+      var page = document.createElement('dl'); page.className = 'calendar';
+      events.forEach(function (event) {
+        var values = {}; event.split(/\r?\n/).forEach(function (line) { var idx = line.indexOf(':'); if (idx > 0) values[line.slice(0, idx).split(';')[0]] = line.slice(idx + 1).replace(/\\n/g, '\n'); });
+        ['SUMMARY', 'DTSTART', 'DTEND', 'LOCATION', 'DESCRIPTION'].forEach(function (key) { if (values[key]) { var dt = document.createElement('dt'); dt.textContent = key; var dd = document.createElement('dd'); dd.textContent = values[key]; page.appendChild(dt); page.appendChild(dd); } });
+      });
+      if (!events.length) page.textContent = 'События не найдены.';
+      content.appendChild(page); done();
+    },
+    csv: async function () { renderCsv(await fetchText()); done(); },
+    xmind: async function () {
+      var zip = await JSZip.loadAsync(await (await fetch(src)).arrayBuffer());
+      var json = zip.file('content.json');
+      var page = document.createElement('section'); page.className = 'mind';
+      if (json) {
+        var sheets = JSON.parse(await json.async('string'));
+        var list = document.createElement('ul');
+        (Array.isArray(sheets) ? sheets : [sheets]).forEach(function (sheet) { list.appendChild(topicTree(sheet.rootTopic || sheet)); });
+        page.appendChild(list);
+      } else {
+        var thumb = zip.file(/(?:^|\/)thumbnail\.(png|jpe?g)$/i)[0];
+        if (!thumb) throw new Error('Не найдены content.json или thumbnail');
+        var image = document.createElement('img'); image.src = URL.createObjectURL(await thumb.async('blob')); image.alt = 'Карта'; page.appendChild(image);
+      }
+      content.appendChild(page); done();
+    },
+    iwork: async function () {
+      var zip = await JSZip.loadAsync(await (await fetch(src)).arrayBuffer());
+      var preview = zip.file(/(?:^|\/)preview(?:-web)?\.jpe?g$/i)[0];
+      if (!preview) throw new Error('В документе нет встроенного preview.jpg');
+      var page = document.createElement('div'); page.className = 'docpage';
+      var image = document.createElement('img'); image.src = URL.createObjectURL(await preview.async('blob')); image.alt = 'Предпросмотр документа'; page.appendChild(image);
+      content.appendChild(page); done();
+    },
+    ppt: async function () {
+      showError('Старый бинарный PPT распознан, но требует отдельного конвертера. PPTX открывается полностью.');
     }
   };
 

@@ -46,7 +46,10 @@ object OdtToHtml {
             // ZIP-контейнер (odt/ods/odp/odg)
             val entries = readZipEntries(ByteArrayInputStream(full))
             val contentXml = entries["content.xml"] ?: throw IOException("content.xml не найден — это не OpenDocument")
-            val styles = collectStyles(newParser(contentXml))
+            // content.xml содержит automatic styles документа и должен
+            // перекрывать одноимённые стили из styles.xml.
+            val styles = (entries["styles.xml"]?.let { collectStyles(newParser(it)) } ?: emptyMap()) +
+                collectStyles(newParser(contentXml))
             renderBody(newParser(contentXml), entries, styles)
         } else {
             // Flat ODF (fodt/fods/fodp/fodg): один XML без контейнера
@@ -75,7 +78,7 @@ object OdtToHtml {
                 val entry = zip.nextEntry ?: break
                 if (!entry.isDirectory) {
                     val name = entry.name
-                    val isNeeded = name == "content.xml" || name.startsWith("Pictures/")
+                    val isNeeded = name == "content.xml" || name == "styles.xml" || name.startsWith("Pictures/")
                     if (isNeeded && entry.size <= MAX_ENTRY_BYTES) {
                         result[name] = zip.readBytes()
                     }
@@ -100,7 +103,6 @@ object OdtToHtml {
 
     private fun collectStyles(parser: XmlPullParser): Map<String, OdtStyle> {
         val styles = mutableMapOf<String, OdtStyle>()
-        var inAutoStyles = false
         var currentName: String? = null
         val props = mutableMapOf<String, String?>()
 
@@ -108,16 +110,14 @@ object OdtToHtml {
             when (parser.eventType) {
                 XmlPullParser.START_TAG -> {
                     when {
-                        parser.name == "automatic-styles" && parser.namespace == NS_OFFICE -> inAutoStyles = true
-
-                        inAutoStyles && parser.name == "style" && parser.namespace == NS_STYLE -> {
+                        parser.name == "style" && parser.namespace == NS_STYLE -> {
                             currentName = parser.getAttributeValue(NS_STYLE, "name")
                             props.clear()
                             val parent = parser.getAttributeValue(NS_STYLE, "parent-style-name")
                             if (parent != null) props["parent"] = parent
                         }
 
-                        inAutoStyles && currentName != null &&
+                        currentName != null &&
                             (parser.name == "text-properties" || parser.name == "paragraph-properties") -> {
                             for (i in 0 until parser.attributeCount) {
                                 val prefix = parser.getAttributePrefix(i)
@@ -138,7 +138,7 @@ object OdtToHtml {
                 }
 
                 XmlPullParser.END_TAG -> {
-                    if (inAutoStyles && parser.name == "style" && parser.namespace == NS_STYLE) {
+                    if (parser.name == "style" && parser.namespace == NS_STYLE) {
                         val name = currentName
                         if (name != null) {
                             styles[name] = OdtStyle(
@@ -153,8 +153,6 @@ object OdtToHtml {
                         }
                         currentName = null
                         props.clear()
-                    } else if (parser.name == "automatic-styles" && parser.namespace == NS_OFFICE) {
-                        inAutoStyles = false
                     }
                 }
             }

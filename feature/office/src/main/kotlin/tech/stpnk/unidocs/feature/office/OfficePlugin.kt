@@ -25,7 +25,8 @@ class OfficePlugin(private val appContext: Context) : tech.stpnk.unidocs.core.mo
         val type = OfficeMatcher.typeFor(context.mimeType, context.displayName, head)
             ?: throw IOException("Не удалось определить формат офисного документа")
 
-        // Конвертируемые форматы (odt/rtf) заранее превращаем в HTML в кэше
+        // Конвертируемые форматы заранее превращаем в HTML в кэше. WebView не
+        // должен получать сырой RTF: браузер не является RTF-рендерером.
         var mediaUri = context.uri
         var mediaName = "office.$type"
         if (type == "odt") {
@@ -33,6 +34,12 @@ class OfficePlugin(private val appContext: Context) : tech.stpnk.unidocs.core.mo
             val outFile = cacheHtml("odt", html)
             mediaUri = Uri.fromFile(outFile).toString()
             mediaName = "odt.html"
+        } else if (type == "rtf") {
+            val bytes = tech.stpnk.unidocs.core.storage.SafFiles.readAll(appContext, Uri.parse(context.uri))
+            val html = RtfToHtml.convert(bytes)
+            val outFile = cacheHtml("rtf", html)
+            mediaUri = Uri.fromFile(outFile).toString()
+            mediaName = "rtf.html"
         } else if (type == "doc") {
             val bytes = tech.stpnk.unidocs.core.storage.SafFiles.readAll(appContext, Uri.parse(context.uri))
             val html = DocToHtml.convert(bytes)

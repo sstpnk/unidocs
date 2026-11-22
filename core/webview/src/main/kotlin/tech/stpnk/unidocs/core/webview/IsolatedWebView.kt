@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
+import java.io.ByteArrayInputStream
 
 /** Хост приложения в домене WebViewAssetLoader (безопасный контекст, без сети). */
 const val ASSET_HOST = "appassets.androidplatform.net"
@@ -56,7 +57,12 @@ class IsolatedWebViewFactory(
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest,
-            ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+            ): WebResourceResponse? {
+                assetLoader.shouldInterceptRequest(request.url)?.let { return it }
+                // Документы могут содержать внешние изображения, стили и скрипты.
+                // Локальный рендер не должен выпускать их в сеть.
+                return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+            }
 
             override fun shouldOverrideUrlLoading(
                 view: WebView,

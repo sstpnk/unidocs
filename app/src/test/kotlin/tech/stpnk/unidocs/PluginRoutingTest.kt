@@ -64,6 +64,11 @@ class PluginRoutingTest {
         assertEquals("office", routeTo("заявление.odt"))
         assertEquals("office", routeTo("таблица.ods"))
         assertEquals("office", routeTo("file", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+        assertEquals("office", routeTo("письмо.xodt"))
+        assertEquals("office", routeTo("карта.xmind"))
+        assertEquals("office", routeTo("документ.pages"))
+        assertEquals("office", routeTo("события.ics"))
+        assertEquals("office", routeTo("архив.mhtml"))
     }
 
     @Test

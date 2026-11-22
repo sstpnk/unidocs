@@ -63,7 +63,8 @@ fun MarkdownScreen(
     onBack: () -> Unit,
     onSave: (onResult: (Boolean) -> Unit) -> Unit,
 ) {
-    var mode by rememberSaveable { mutableStateOf(ViewMode.SPLIT) }
+    // Открытие Markdown — прежде всего чтение; редактор остаётся в одном тапе.
+    var mode by rememberSaveable { mutableStateOf(ViewMode.PREVIEW) }
     var savedText by remember(session) { mutableStateOf(session.text.value) }
     var editorValue by remember(session) { mutableStateOf(TextFieldValue(session.text.value)) }
     var showExitDialog by remember { mutableStateOf(false) }
