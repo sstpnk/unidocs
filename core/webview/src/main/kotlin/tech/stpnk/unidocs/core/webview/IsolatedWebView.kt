@@ -8,6 +8,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.WebChromeClient
+import android.webkit.ConsoleMessage
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -28,6 +30,8 @@ class IsolatedWebViewFactory(
     private val context: Context,
     /** Обработчик путей поверх /media/ — например, раздача файла книги из SAF. */
     private val mediaHandler: WebViewAssetLoader.PathHandler? = null,
+    /** Проброс JS-консоли (message, level 0..4); нужен для диагностики тихих сбоев. */
+    private val onConsole: ((String, Int) -> Unit)? = null,
 ) {
     val assetLoader: WebViewAssetLoader = WebViewAssetLoader.Builder()
         .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
@@ -40,6 +44,14 @@ class IsolatedWebViewFactory(
             ViewGroup.LayoutParams.MATCH_PARENT,
         )
         configureIsolated(this)
+        onConsole?.let { cb ->
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                    cb(message.message(), message.messageLevel().ordinal)
+                    return true
+                }
+            }
+        }
         webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
                 view: WebView,
@@ -97,9 +109,10 @@ fun IsolatedWebView(
     onWebViewCreated: (WebView) -> Unit = {},
     onPageFinished: (WebView) -> Unit = {},
     onExternalLink: (Uri) -> Unit = {},
+    onConsole: ((String, Int) -> Unit)? = null,
 ) {
-    val factory = remember(context, mediaHandler) {
-        IsolatedWebViewFactory(context, mediaHandler)
+    val factory = remember(context, mediaHandler, onConsole) {
+        IsolatedWebViewFactory(context, mediaHandler, onConsole)
     }
     val callbacks = remember(factory, onPageFinished, onExternalLink) {
         object : IsolatedWebViewFactory.ClientCallbacks {

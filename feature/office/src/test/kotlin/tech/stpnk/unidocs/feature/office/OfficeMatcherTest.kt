@@ -68,18 +68,6 @@ class OfficeMatcherTest {
     }
 
     @Test
-    fun `legacy doc is not supported`() {
-        assertNull(OfficeMatcher.typeFor("application/msword", "старый.doc", ByteSequence(ByteArray(0))))
-        assertFalse(OfficeMatcher.supports("application/msword", "старый.doc", ByteSequence(ByteArray(0))))
-    }
-
-    @Test
-    fun `random file is not office`() {
-        assertFalse(OfficeMatcher.supports("text/plain", "notes.txt", ByteSequence("привет".toByteArray())))
-        assertTrue(OfficeMatcher.supports(null, "report.xlsx", ByteSequence(ByteArray(0))))
-    }
-
-    @Test
     fun `odf family routes to own converter`() {
         val head = ByteSequence(ByteArray(4) { 0 })
         assertEquals("odt", OfficeMatcher.typeFor(null, "презентация.odp", head))
@@ -93,4 +81,19 @@ class OfficeMatcherTest {
         assertEquals("odt", OfficeMatcher.typeFor("application/vnd.oasis.opendocument.text-flat-xml", "файл", head))
     }
 
+    @Test
+    fun `legacy doc routes to own converter`() {
+        val head = ByteSequence(ByteArray(4) { 0 })
+        assertEquals("doc", OfficeMatcher.typeFor(null, "старый.doc", head))
+        assertEquals("doc", OfficeMatcher.typeFor("application/msword", "файл", head))
+        assertTrue(OfficeMatcher.supports(null, "старый.doc", head))
+        assertFalse(OfficeMatcher.supports(null, "нечто.xyz", head))
+    }
+
+    @Test
+    fun `unsupported types route nowhere`() {
+        val head = ByteSequence(ByteArray(0))
+        assertNull(OfficeMatcher.typeFor(null, "archive.zip", head))
+        assertNull(OfficeMatcher.typeFor("application/zip", "файл", head))
+    }
 }

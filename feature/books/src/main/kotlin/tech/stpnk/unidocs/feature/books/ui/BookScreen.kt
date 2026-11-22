@@ -448,6 +448,13 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                     }
                 },
+                onConsole = { message, level ->
+                    if (level >= 3) {
+                        main.post {
+                            if (!opened) openError = "JS: " + message.take(300)
+                        }
+                    }
+                },
             )
             if (!opened) {
                 Box(

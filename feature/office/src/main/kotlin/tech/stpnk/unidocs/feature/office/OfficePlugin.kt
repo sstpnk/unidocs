@@ -10,7 +10,7 @@ import java.io.IOException
 
 /**
  * Плагин офисных форматов: docx/xlsx/pptx через JS-движки в изолированном WebView,
- * odt/ods/rtf — через собственные конвертеры (RtfToHtml / OdtToHtml).
+ * odt/ods/rtf — через собственные конвертеры (RtfToHtml / OdtToHtml / DocToHtml).
  */
 class OfficePlugin(private val appContext: Context) : tech.stpnk.unidocs.core.model.DocumentPlugin {
 
@@ -33,12 +33,12 @@ class OfficePlugin(private val appContext: Context) : tech.stpnk.unidocs.core.mo
             val outFile = cacheHtml("odt", html)
             mediaUri = Uri.fromFile(outFile).toString()
             mediaName = "odt.html"
-        } else if (type == "rtf") {
+        } else if (type == "doc") {
             val bytes = tech.stpnk.unidocs.core.storage.SafFiles.readAll(appContext, Uri.parse(context.uri))
-            val html = RtfToHtml.convert(bytes)
-            val outFile = cacheHtml("rtf", html)
+            val html = DocToHtml.convert(bytes)
+            val outFile = cacheHtml("doc", html)
             mediaUri = Uri.fromFile(outFile).toString()
-            mediaName = "rtf.html"
+            mediaName = "doc.html"
         }
 
         return OfficeSession(

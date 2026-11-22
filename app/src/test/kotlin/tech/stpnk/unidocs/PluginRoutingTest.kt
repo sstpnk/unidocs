@@ -76,7 +76,7 @@ class PluginRoutingTest {
     @Test
     fun `unsupported types route nowhere`() {
         assertNull(routeTo("archive.zip", "application/zip"))
-        assertNull(routeTo("старый.doc", "application/msword"))
+        assertEquals("office", routeTo("старый.doc", "application/msword"))
         assertNull(routeTo("image.png", "image/png"))
     }
 

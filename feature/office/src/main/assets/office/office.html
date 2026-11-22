@@ -100,7 +100,8 @@
 
   window.addEventListener('load', function () {
     if (bridge) bridge.onPageReady();
-    var render = renderers[type];
+    renderers.doc = renderers.odt;
+  var render = renderers[type];
     if (!render) {
       showError(T.unsupported + type);
       return;

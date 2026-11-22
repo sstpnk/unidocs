@@ -21,6 +21,7 @@ object OfficeMatcher {
         "application/vnd.ms-excel" to "xlsx",
         "application/rtf" to "rtf",
         "text/rtf" to "rtf",
+        "application/msword" to "doc",
     )
 
     private val extensionToType = mapOf(
@@ -38,6 +39,7 @@ object OfficeMatcher {
         "fodp" to "odt",
         "fodg" to "odt",
         "rtf" to "rtf",
+        "doc" to "doc",
     )
 
     fun typeFor(mimeType: String?, displayName: String, head: ByteSequence): String? {

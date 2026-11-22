@@ -111,26 +111,55 @@ window.reader = {
     async open(url) {
         try {
             let input = url
-            // FB2 часто в cp1251/koi8 и с BOM: foliate тогда показывает кракозябры
-            // или падает молча. Декодируем сами и отдаём foliate чистый UTF-8.
+            // FB2 в дикой природе: cp1251, koi8, utf-16, BOM, кривые декларации.
+            // foliate по одной декларации угадывает плохо и молча даёт пустую книгу.
+            // Сами ищем кодировку, при которой XML реально парсится в FictionBook.
             try {
                 const res = await fetch(url)
                 if (res.ok) {
                     const buf = await res.arrayBuffer()
+                    console.info('[fb2] fetched ' + buf.byteLength + ' bytes')
                     const head = new Uint8Array(buf, 0, Math.min(4, buf.byteLength))
                     const isZip = head[0] === 0x50 && head[1] === 0x4B
                     const isPdf = head[0] === 0x25 && head[1] === 0x50
                     if (!isZip && !isPdf && /\.(fb2|fbz)$/i.test(url)) {
-                        let text = new TextDecoder('utf-8').decode(buf)
-                        const enc = text.match(/^\uFEFF?\s*<\?xml\s+version\s*=\s*["']1\.\d+["']\s+encoding\s*=\s*["']([A-Za-z0-9._-]+)["']/i)?.[1]
-                        if (enc && enc.toLowerCase() !== 'utf-8' && enc.toLowerCase() !== 'utf8') {
-                            try { text = new TextDecoder(enc).decode(buf) } catch (e) { /* незнакомая метка — как есть */ }
+                        const bytes = new Uint8Array(buf)
+                        const bom = (bytes[0] === 0xFF && bytes[1] === 0xFE) ? 'utf-16le'
+                            : (bytes[0] === 0xFE && bytes[1] === 0xFF) ? 'utf-16be'
+                            : (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) ? 'utf-8' : null
+                        const headStr = new TextDecoder('utf-8').decode(bytes.subarray(0, 512))
+                        const decl = headStr.match(/<\?xml\s+version\s*=\s*["']1\.\d+["']\s+encoding\s*=\s*["']([A-Za-z0-9._-]+)["']/i)?.[1]
+                        const candidates = []
+                        if (bom) candidates.push(bom)
+                        if (decl) candidates.push(decl.toLowerCase())
+                        for (const c of ['utf-8', 'windows-1251', 'koi8-r', 'iso-8859-5', 'utf-16le', 'utf-16be']) {
+                            if (!candidates.includes(c)) candidates.push(c)
                         }
-                        text = text.replace(/^\uFEFF/, '')
-                        // Объявление переписываем на utf-8: foliate декодирует повторно по нему
-                        text = text.replace(/^(\s*<\?xml\s+version\s*=\s*["']1\.\d+["']\s+encoding\s*=\s*)["'][^"']+["']/i, '$1"utf-8"')
-                        input = new File([new TextEncoder().encode(text)], 'book.fb2', { type: 'application/x-fictionbook+xml' })
+                        let best = null
+                        for (const enc of candidates) {
+                            try {
+                                const text = new TextDecoder(enc).decode(bytes).replace(/^\uFEFF/, '')
+                                const doc = new DOMParser().parseFromString(text, 'application/xml')
+                                if (!doc.querySelector('parsererror') &&
+                                    doc.documentElement && doc.documentElement.localName.toLowerCase() === 'fictionbook') {
+                                    best = text
+                                    console.info('[fb2] decode ok via ' + enc)
+                                    break
+                                }
+                            } catch (e) { console.warn('[fb2] decode fail ' + enc + ': ' + e) }
+                        }
+                        if (best) {
+                            // declaration → utf-8: foliate перекодирует повторно по ней
+                            best = best.replace(/^(\s*<\?xml\s+version\s*=\s*["']1\.\d+["']\s+encoding\s*=\s*)["'][^"']+["']/i, '$1"utf-8"')
+                            input = new File([new TextEncoder().encode(best)], 'book.fb2', { type: 'application/x-fictionbook+xml' })
+                        } else {
+                            console.error('[fb2] ни одна кодировка не дала валидный XML')
+                            bridge && bridge.onError('FB2: не удалось определить кодировку файла')
+                            return 'error'
+                        }
                     }
+                } else {
+                    console.error('[fb2] fetch ' + res.status)
                 }
             } catch (e) { console.error('fb2 preopen:', e) }
             // ВАЖНО: view.open() не возвращает книгу — она попадает в view.book
