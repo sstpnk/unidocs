@@ -67,6 +67,10 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
                 val meta = SafFiles.queryMeta(context, uri)
                 val head = SafFiles.readHead(context, uri)
                 val plugin = registry.findFor(meta.mimeType, meta.displayName, ByteSequence(head))
+                    // Не оставляем пользователя на сообщении «нет плагина»: XML,
+                    // исходники и неизвестные текстовые форматы всегда можно
+                    // прочитать как текст.
+                    ?: registry.find("text")
 
                 recentsStore.upsert(
                     RecentDocument(
@@ -78,20 +82,26 @@ class DocumentsViewModel(application: Application) : AndroidViewModel(applicatio
                     ),
                 )
 
-                if (plugin == null) {
-                    _messages.emit(context.getString(R.string.app_no_plugin, meta.displayName))
-                    return@launch
-                }
-
-                val opened = plugin.open(
-                    OpenContext(
-                        uri = meta.uri,
-                        displayName = meta.displayName,
-                        mimeType = meta.mimeType,
-                        sizeBytes = meta.sizeBytes,
-                        sniff = { ByteSequence(SafFiles.readHead(context, uri)) },
-                    ),
+                val openContext = OpenContext(
+                    uri = meta.uri,
+                    displayName = meta.displayName,
+                    mimeType = meta.mimeType,
+                    sizeBytes = meta.sizeBytes,
+                    sniff = { ByteSequence(SafFiles.readHead(context, uri)) },
                 )
+                val opened = if (plugin == null) {
+                    throw IllegalStateException("Нет средства для открытия файла")
+                } else {
+                    // Неверное расширение встречается часто: например, RTF под
+                    // видом DOC. Если специализированный разбор не прошёл,
+                    // оставляем содержимое доступным в текстовом режиме.
+                    runCatching { plugin.open(openContext) }.getOrElse { error ->
+                        val textPlugin = registry.find("text")
+                        if (plugin.id == "text" || textPlugin == null) throw error
+                        _messages.emit("Не удалось распознать формат; открыт текстовый режим")
+                        textPlugin.open(openContext)
+                    }
+                }
                 currentUri = meta.uri
                 _session.value = opened
             } catch (e: SecurityException) {

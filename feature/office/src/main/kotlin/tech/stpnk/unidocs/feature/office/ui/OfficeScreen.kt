@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -21,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +56,7 @@ fun OfficeScreen(session: OfficeSession, onBack: () -> Unit) {
     val webViewRef = remember { AtomicReference<WebView?>(null) }
     var rendered by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var csvMode by rememberSaveable { mutableStateOf("table") }
 
     val mediaHandler = remember(session) {
         WebViewAssetLoader.PathHandler { path ->
@@ -88,7 +91,15 @@ fun OfficeScreen(session: OfficeSession, onBack: () -> Unit) {
             }
 
             override fun onRendered() {
-                main.post { rendered = true }
+                main.post {
+                    rendered = true
+                    if (session.officeType == "csv") {
+                        webViewRef.get()?.evaluateJavascript(
+                            "window.csvView && window.csvView.setMode('$csvMode')",
+                            null,
+                        )
+                    }
+                }
             }
 
             override fun onError(message: String) {
@@ -116,6 +127,26 @@ fun OfficeScreen(session: OfficeSession, onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Text("←", style = MaterialTheme.typography.titleLarge)
+                    }
+                },
+                actions = {
+                    if (session.officeType == "csv") {
+                        FilterChip(
+                            selected = csvMode == "table",
+                            onClick = {
+                                csvMode = "table"
+                                webViewRef.get()?.evaluateJavascript("window.csvView && window.csvView.setMode('table')", null)
+                            },
+                            label = { Text("Таблица") },
+                        )
+                        FilterChip(
+                            selected = csvMode == "text",
+                            onClick = {
+                                csvMode = "text"
+                                webViewRef.get()?.evaluateJavascript("window.csvView && window.csvView.setMode('text')", null)
+                            },
+                            label = { Text("Текст") },
+                        )
                     }
                 },
             )

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,7 +22,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,13 +45,12 @@ import tech.stpnk.unidocs.feature.markdown.parser.MdBlock
 import androidx.compose.runtime.collectAsState
 
 private enum class ViewMode {
-    EDIT,
-    SPLIT,
+    TEXT,
     PREVIEW,
 }
 
 /**
- * Экран Markdown: режимы «Текст / Сплит / Превью», тулбар вставки разметки,
+ * Экран Markdown: режимы «Текст / Превью», тулбар вставки разметки,
  * явное сохранение через SAF и предупреждение о несохранённых изменениях.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,7 +116,7 @@ fun MarkdownScreen(
                     },
                 )
 
-                mode == ViewMode.EDIT -> EditorPane(
+                mode == ViewMode.TEXT -> EditorPane(
                     value = editorValue,
                     onChange = {
                         editorValue = it
@@ -129,21 +126,6 @@ fun MarkdownScreen(
 
                 mode == ViewMode.PREVIEW -> PreviewPane(blocks)
 
-                mode == ViewMode.SPLIT -> Row(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        EditorPane(
-                            value = editorValue,
-                            onChange = {
-                                editorValue = it
-                                session.updateText(it.text)
-                            },
-                        )
-                    }
-                    VerticalDivider()
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        PreviewPane(blocks)
-                    }
-                }
             }
         }
     }
@@ -181,8 +163,7 @@ private fun ModeChips(current: ViewMode, onSelect: (ViewMode) -> Unit) {
     ) {
         ViewMode.entries.forEach { mode ->
             val label = when (mode) {
-                ViewMode.EDIT -> stringResource(R.string.md_mode_text)
-                ViewMode.SPLIT -> stringResource(R.string.md_mode_split)
+                ViewMode.TEXT -> stringResource(R.string.md_mode_text)
                 ViewMode.PREVIEW -> stringResource(R.string.md_mode_preview)
             }
             FilterChip(

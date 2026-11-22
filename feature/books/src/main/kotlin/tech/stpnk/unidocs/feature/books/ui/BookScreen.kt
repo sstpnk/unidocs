@@ -442,7 +442,6 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                 jsBridge = bridge,
                 mediaHandler = mediaHandler,
                 onWebViewCreated = { webView = it },
-                onPageFinished = { pageReady = true },
                 onExternalLink = { uri ->
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
@@ -456,7 +455,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                     }
                 },
             )
-            if (!opened) {
+            if (!opened && openError == null) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -468,6 +467,23 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 12.dp),
                         )
+                    }
+                }
+            }
+            openError?.let { message ->
+                Card(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Ошибка книги", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        TextButton(onClick = { openError = null }, modifier = Modifier.padding(top = 4.dp)) { Text("Скрыть") }
                     }
                 }
             }
@@ -518,7 +534,7 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
         }
     }
 
-    if (pageReady && !opened) {
+    if (pageReady && !opened && openError == null) {
         LaunchedEffect(pageReady) {
             delay(100)
             webView?.evaluateJavascript(
@@ -528,28 +544,11 @@ fun BookScreen(session: BookSession, onBack: () -> Unit) {
         }
     }
 
-    if (openError != null) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Ошибка книги",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-                Text(
-                    text = openError.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                TextButton(onClick = { openError = null }, modifier = Modifier.padding(top = 4.dp)) {
-                    Text("Скрыть")
-                }
+    LaunchedEffect(pageReady, session, opened, openError) {
+        if (pageReady && !opened) {
+            delay(30_000)
+            if (!opened && openError == null) {
+                openError = "Книга не открылась за 30 секунд. Проверьте формат файла или повторите попытку."
             }
         }
     }

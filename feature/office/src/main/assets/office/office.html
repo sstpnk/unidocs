@@ -14,7 +14,8 @@
   .docpage table, #content table { border-collapse: collapse; }
   .docpage td, .docpage th, #content td, #content th { border: 1px solid #a0a0a0; padding: 4px 8px; vertical-align: top; }
   .docpage img, #content img { max-width: 100%; height: auto; }
-  .docx-wrapper { background: #fff; margin: 12px auto; padding: 16px; max-width: 900px; box-shadow: 0 1px 5px rgba(0,0,0,.28); }
+  #content .docx-wrapper { background: #fff; margin: 12px auto !important; padding: 20px !important; max-width: calc(100vw - 24px); box-sizing: border-box; overflow-x: auto; box-shadow: 0 1px 5px rgba(0,0,0,.28); }
+  #content .docx { margin: 0 auto !important; box-sizing: border-box; }
   .source { white-space: pre-wrap; overflow-wrap: anywhere; background: #fff; margin: 12px; padding: 16px; }
   .mail, .calendar, .mind { background: #fff; margin: 12px auto; padding: 16px; max-width: 900px; box-shadow: 0 1px 5px rgba(0,0,0,.28); }
   .calendar dt { font-weight: 600; margin-top: 10px; }
@@ -62,8 +63,18 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  async function fetchBytes() {
+    return new Uint8Array(await (await fetch(src)).arrayBuffer());
+  }
+
   async function fetchText() {
-    return (await fetch(src)).text();
+    return new TextDecoder('utf-8').decode(await fetchBytes());
+  }
+
+  // RFC 822 messages are byte streams. Reading one with Response.text() first
+  // irreversibly corrupts a Windows-1251 body before MIME decoding can start.
+  async function fetchMimeSource() {
+    return new TextDecoder('iso-8859-1').decode(await fetchBytes());
   }
 
   // User HTML is shown as a document, not run as application code. Network
@@ -88,12 +99,44 @@
     });
   }
 
+  function charsetFromHeaders(headers) {
+    var match = (headers['content-type'] || '').match(/charset\s*=\s*["']?([^\s;"']+)/i);
+    return match && match[1] ? match[1].trim() : 'utf-8';
+  }
+
+  function bytesFromBinary(value) {
+    var bytes = new Uint8Array(value.length);
+    for (var i = 0; i < value.length; i++) bytes[i] = value.charCodeAt(i) & 255;
+    return bytes;
+  }
+
+  function decodeBytes(bytes, charset) {
+    try { return new TextDecoder(charset || 'utf-8').decode(bytes); }
+    catch (_) {
+      try { return new TextDecoder('windows-1251').decode(bytes); }
+      catch (_) { return new TextDecoder('utf-8').decode(bytes); }
+    }
+  }
+
+  function decodeMimeWords(value) {
+    return String(value || '').replace(/=\?([^?]+)\?([bq])\?([^?]*)\?=/gi, function (_, charset, encoding, payload) {
+      try {
+        var binary = encoding.toLowerCase() === 'b'
+          ? atob(payload.replace(/\s/g, ''))
+          : decodeQuotedPrintable(payload.replace(/_/g, ' '));
+        return decodeBytes(bytesFromBinary(binary), charset);
+      } catch (_) { return payload; }
+    });
+  }
+
   function decodeMimeBody(body, headers) {
     var encoding = (headers['content-transfer-encoding'] || '').toLowerCase();
     if (encoding.indexOf('base64') >= 0) {
-      try { return decodeURIComponent(Array.prototype.map.call(atob(body.replace(/\s/g, '')), function (c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); } catch (_) { return atob(body.replace(/\s/g, '')); }
+      try { return decodeBytes(bytesFromBinary(atob(body.replace(/\s/g, ''))), charsetFromHeaders(headers)); }
+      catch (_) { return body; }
     }
-    return encoding.indexOf('quoted-printable') >= 0 ? decodeQuotedPrintable(body) : body;
+    var binary = encoding.indexOf('quoted-printable') >= 0 ? decodeQuotedPrintable(body) : body;
+    return decodeBytes(bytesFromBinary(binary), charsetFromHeaders(headers));
   }
 
   function parseHeaders(raw) {
@@ -149,9 +192,15 @@
     });
     page.appendChild(table); content.appendChild(page);
     var raw = document.createElement('pre'); raw.className = 'source'; raw.textContent = text;
-    var toggle = document.createElement('button'); toggle.textContent = 'Показать как текст';
-    toggle.onclick = function () { var isRaw = raw.parentNode; if (isRaw) { raw.remove(); page.style.display = ''; toggle.textContent = 'Показать как текст'; } else { page.style.display = 'none'; content.appendChild(raw); toggle.textContent = 'Показать как таблицу'; } };
-    content.insertBefore(toggle, page);
+    content.appendChild(raw);
+    window.csvView = {
+      setMode: function (mode) {
+        var textMode = mode === 'text';
+        page.style.display = textMode ? 'none' : '';
+        raw.style.display = textMode ? '' : 'none';
+      }
+    };
+    window.csvView.setMode('table');
   }
 
   function topicTree(topic) {
@@ -228,6 +277,12 @@
     docx: async function () {
       var buffer = await (await fetch(src)).arrayBuffer();
       await docx.renderAsync(buffer, content, null, { inWrapper: true });
+      var wrapper = content.querySelector('.docx-wrapper');
+      if (wrapper) {
+        wrapper.style.margin = '12px auto';
+        wrapper.style.maxWidth = 'calc(100vw - 24px)';
+        wrapper.style.boxSizing = 'border-box';
+      }
       done();
     },
     xlsx: async function () {
@@ -257,7 +312,23 @@
       done();
     },
     pptx: async function () {
-      $('#content').pptxToHtml({ pptxFileUrl: src });
+      var zip = await JSZip.loadAsync(await (await fetch(src)).arrayBuffer());
+      var slides = Object.keys(zip.files).filter(function (name) { return /^ppt\/slides\/slide\d+\.xml$/i.test(name); })
+        .sort(function (a, b) { return Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]); });
+      if (!slides.length) throw new Error('В PPTX не найдены слайды');
+      for (var i = 0; i < slides.length; i++) {
+        var xml = await zip.file(slides[i]).async('string');
+        var doc = new DOMParser().parseFromString(xml, 'application/xml');
+        var page = document.createElement('section'); page.className = 'docpage slide';
+        var title = document.createElement('h2'); title.textContent = 'Слайд ' + (i + 1); page.appendChild(title);
+        var paragraphs = doc.getElementsByTagNameNS('*', 'p');
+        Array.prototype.forEach.call(paragraphs, function (paragraph) {
+          var texts = paragraph.getElementsByTagNameNS('*', 't');
+          var value = Array.prototype.map.call(texts, function (node) { return node.textContent; }).join('');
+          if (value) { var line = document.createElement('p'); line.textContent = value; page.appendChild(line); }
+        });
+        content.appendChild(page);
+      }
       done();
     },
     odt: async function () {
@@ -275,14 +346,19 @@
       done();
     },
     mhtml: async function () {
-      var part = extractMime(await fetchText(), 'text/html');
+      var part = extractMime(await fetchMimeSource(), 'text/html');
       content.innerHTML = safeHtml(part.body || '<p>HTML-часть MHTML не найдена.</p>');
       done();
     },
     eml: async function () {
-      var part = extractMime(await fetchText(), 'text/html');
+      var raw = await fetchMimeSource();
+      var headerEnd = raw.search(/\r?\n\r?\n/);
+      var messageHeaders = parseHeaders(headerEnd >= 0 ? raw.slice(0, headerEnd) : raw);
+      var part = extractMime(raw, 'text/html');
       var page = document.createElement('article'); page.className = 'mail';
-      var from = part.headers.from || ''; var to = part.headers.to || ''; var subject = part.headers.subject || '';
+      var from = decodeMimeWords(messageHeaders.from || part.headers.from);
+      var to = decodeMimeWords(messageHeaders.to || part.headers.to);
+      var subject = decodeMimeWords(messageHeaders.subject || part.headers.subject);
       page.innerHTML = '<h2>' + escapeHtml(subject) + '</h2><p><b>От:</b> ' + escapeHtml(from) + '<br><b>Кому:</b> ' + escapeHtml(to) + '</p>' + safeHtml(part.body || '');
       content.appendChild(page); done();
     },
