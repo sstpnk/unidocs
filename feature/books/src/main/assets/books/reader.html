@@ -107,6 +107,256 @@ view.addEventListener('relocate', e => {
     }))
 })
 
+// ===== FB2 → EPUB (собственная конвертация; fb2.js foliate обходим) =====
+
+function crc32(bytes) {
+    let table = crc32.table
+    if (!table) {
+        table = crc32.table = new Int32Array(256)
+        for (let n = 0; n < 256; n++) {
+            let c = n
+            for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1)
+            table[n] = c
+        }
+    }
+    let crc = -1
+    for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xFF]
+    return (crc ^ -1) >>> 0
+}
+
+function makeStoreZip(files) {
+    const enc = new TextEncoder()
+    const chunks = []
+    const central = []
+    let offset = 0
+    const now = new Date()
+    const dosTime = ((now.getHours() & 31) << 11) | ((now.getMinutes() & 63) << 5) | ((now.getSeconds() / 2) & 31)
+    const dosDate = (((now.getFullYear() - 1980) & 127) << 9) | (((now.getMonth() + 1) & 15) << 5) | (now.getDate() & 31)
+    for (const f of files) {
+        const nameB = enc.encode(f.name)
+        const crc = crc32(f.data)
+        const lh = new DataView(new ArrayBuffer(30))
+        lh.setUint32(0, 0x04034b50, true)
+        lh.setUint16(4, 20, true)
+        lh.setUint16(6, 0x0800, true)
+        lh.setUint16(8, 0, true)
+        lh.setUint16(10, dosTime, true)
+        lh.setUint16(12, dosDate, true)
+        lh.setUint32(14, crc, true)
+        lh.setUint32(18, f.data.length, true)
+        lh.setUint32(22, f.data.length, true)
+        lh.setUint16(26, nameB.length, true)
+        lh.setUint16(28, 0, true)
+        chunks.push(new Uint8Array(lh.buffer), nameB, f.data)
+        const ch = new DataView(new ArrayBuffer(46))
+        ch.setUint32(0, 0x02014b50, true)
+        ch.setUint16(4, 20, true)
+        ch.setUint16(6, 20, true)
+        ch.setUint16(8, 0x0800, true)
+        ch.setUint16(12, dosTime, true)
+        ch.setUint16(14, dosDate, true)
+        ch.setUint32(16, crc, true)
+        ch.setUint32(20, f.data.length, true)
+        ch.setUint32(24, f.data.length, true)
+        ch.setUint16(28, nameB.length, true)
+        ch.setUint32(42, offset, true)
+        central.push(new Uint8Array(ch.buffer), nameB)
+        offset += 30 + nameB.length + f.data.length
+    }
+    const cdStart = offset
+    let cdSize = 0
+    for (const c of central) cdSize += c.length
+    const eocd = new DataView(new ArrayBuffer(22))
+    eocd.setUint32(0, 0x06054b50, true)
+    eocd.setUint16(8, files.length, true)
+    eocd.setUint16(10, files.length, true)
+    eocd.setUint32(12, cdSize, true)
+    eocd.setUint32(16, cdStart, true)
+    const out = new Uint8Array(cdStart + cdSize + 22)
+    let pos = 0
+    for (const c of [...chunks, ...central]) { out.set(c, pos); pos += c.length }
+    out.set(new Uint8Array(eocd.buffer), pos)
+    return out
+}
+
+function fb2Esc(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function fb2ToChapters(doc) {
+    const binaries = {}
+    for (const b of doc.getElementsByTagName('binary')) {
+        const id = b.getAttribute('id')
+        const ct = b.getAttribute('content-type') || 'image/png'
+        const text = (b.textContent || '').replace(/\s+/g, '')
+        if (id && text.length && text.length <= 8 * 1024 * 1024) binaries[id] = 'data:' + ct + ';base64,' + text
+    }
+    function xlinkHref(el) {
+        return el.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
+            || el.getAttribute('href') || ''
+    }
+    function renderInline(node, out) {
+        for (const child of node.childNodes) {
+            if (child.nodeType === 3) { out.push(fb2Esc(child.nodeValue || '')); continue }
+            if (child.nodeType !== 1) continue
+            const name = child.localName
+            if (name === 'strong') { out.push('<strong>'); renderInline(child, out); out.push('</strong>') }
+            else if (name === 'emphasis') { out.push('<em>'); renderInline(child, out); out.push('</em>') }
+            else if (name === 'strikethrough') { out.push('<s>'); renderInline(child, out); out.push('</s>') }
+            else if (name === 'sub') { out.push('<sub>'); renderInline(child, out); out.push('</sub>') }
+            else if (name === 'sup') { out.push('<sup>'); renderInline(child, out); out.push('</sup>') }
+            else if (name === 'code') { out.push('<code>'); renderInline(child, out); out.push('</code>') }
+            else if (name === 'style') { out.push('<span>'); renderInline(child, out); out.push('</span>') }
+            else if (name === 'a') { out.push('<a href="' + fb2Esc(xlinkHref(child)) + '">'); renderInline(child, out); out.push('</a>') }
+            else if (name === 'image') {
+                const src = binaries[xlinkHref(child).replace(/^#/, '')]
+                if (src) out.push('<img alt="" src="' + src + '">')
+            }
+            else if (name === 'br') out.push('<br>')
+            else renderInline(child, out)
+        }
+    }
+    function renderBlock(node, out) {
+        const name = node.localName
+        if (name === 'title') {
+            out.push('<h2>')
+            for (const p of node.getElementsByTagName('p')) {
+                const t = []
+                renderInline(p, t)
+                out.push(fb2Esc(t.join('').trim()) + '<br>')
+            }
+            out.push('</h2>')
+        } else if (name === 'subtitle') {
+            out.push('<h3>'); renderInline(node, out); out.push('</h3>')
+        } else if (name === 'p') {
+            out.push('<p>'); renderInline(node, out); out.push('</p>')
+        } else if (name === 'empty-line') {
+            out.push('<br>')
+        } else if (name === 'poem' || name === 'cite' || name === 'epigraph') {
+            out.push('<blockquote>')
+            for (const c of node.children) renderBlock(c, out)
+            out.push('</blockquote>')
+        } else if (name === 'stanza') {
+            for (const v of node.getElementsByTagName('v')) {
+                out.push('<p style="margin-left:2em">')
+                renderInline(v, out)
+                out.push('</p>')
+            }
+        } else if (name === 'table') {
+            out.push('<table>')
+            for (const tr of node.getElementsByTagName('tr')) {
+                out.push('<tr>')
+                for (const td of tr.children) {
+                    out.push('<td>')
+                    for (const p of td.getElementsByTagName('p')) {
+                        const t = []
+                        renderInline(p, t)
+                        out.push(fb2Esc(t.join('')))
+                    }
+                    out.push('</td>')
+                }
+                out.push('</tr>')
+            }
+            out.push('</table>')
+        } else if (name === 'v') {
+            out.push('<p style="margin-left:2em">')
+            renderInline(node, out)
+            out.push('</p>')
+        } else {
+            const t = []
+            renderInline(node, t)
+            const txt = t.join('').trim()
+            if (txt) out.push('<p>' + txt + '</p>')
+        }
+    }
+    const bodies = [...doc.getElementsByTagName('body')]
+    const mainBody = bodies.find(b => {
+        const n = b.getAttribute('name')
+        return !n || n === 'main'
+    }) || bodies[0]
+    if (!mainBody) return null
+    const titleEl = doc.querySelector('title-info book-title')
+    const title = ((titleEl && titleEl.textContent) || '').trim() || 'FB2'
+    const blocks = [...mainBody.children].filter(n => n.nodeType === 1)
+    const chapters = []
+    const secEls = blocks.filter(n => n.localName === 'section')
+    const renderSection = (sec, out) => {
+        const t = [...sec.children].find(c => c.localName === 'title')
+        if (t) renderBlock(t, out)
+        for (const c of sec.children) {
+            if (c === t) continue
+            if (c.localName === 'section') renderSection(c, out)
+            else renderBlock(c, out)
+        }
+    }
+    if (secEls.length) {
+        for (const sec of secEls) {
+            const out = []
+            renderSection(sec, out)
+            chapters.push(out.join('\n'))
+        }
+    } else {
+        const out = []
+        for (const c of blocks) renderBlock(c, out)
+        chapters.push(out.join('\n'))
+    }
+    return { title: title, chapters: chapters }
+}
+
+function fb2ToEpub(fb) {
+    const enc = new TextEncoder()
+    const xhtml = body => '<?xml version="1.0" encoding="utf-8"?>\n' +
+        '<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"/>' +
+        '<title>' + fb2Esc(fb.title) + '</title>' +
+        '<style>body{margin:0;padding:1em;line-height:1.55}img{max-width:100%}</style>' +
+        '</head><body>' + body + '</body></html>'
+    const files = [{ name: 'mimetype', data: enc.encode('application/epub+zip') }]
+    files.push({
+        name: 'META-INF/container.xml',
+        data: enc.encode('<?xml version="1.0"?><container version="1.0" ' +
+            'xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>' +
+            '<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>' +
+            '</rootfiles></container>'),
+    })
+    const manifest = []
+    const spine = []
+    const navMap = []
+    fb.chapters.forEach((ch, i) => {
+        const id = 'ch' + (i + 1)
+        const href = 'chapter' + (i + 1) + '.xhtml'
+        manifest.push('<item id="' + id + '" href="' + href + '" media-type="application/xhtml+xml"/>')
+        spine.push('<itemref idref="' + id + '"/>')
+        files.push({ name: 'OEBPS/' + href, data: enc.encode(xhtml(ch)) })
+        navMap.push('<navPoint id="n' + (i + 1) + '" playOrder="' + (i + 1) + '">' +
+            '<navLabel><text>' + fb2Esc(fb.title) + ' — ' + (i + 1) + '</text></navLabel>' +
+            '<content src="' + href + '"/></navPoint>')
+    })
+    const uid = 'urn:uuid:' + (crypto.randomUUID ? crypto.randomUUID() : Date.now())
+    files.push({
+        name: 'OEBPS/content.opf',
+        data: enc.encode('<?xml version="1.0" encoding="utf-8"?>' +
+            '<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uid">' +
+            '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+            '<dc:title>' + fb2Esc(fb.title) + '</dc:title>' +
+            '<dc:language>ru</dc:language>' +
+            '<dc:identifier id="uid">' + fb2Esc(uid) + '</dc:identifier>' +
+            '</metadata>' +
+            '<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>' +
+            manifest.join('') + '</manifest>' +
+            '<spine toc="ncx">' + spine.join('') + '</spine></package>'),
+    })
+    files.push({
+        name: 'OEBPS/toc.ncx',
+        data: enc.encode('<?xml version="1.0" encoding="utf-8"?>' +
+            '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">' +
+            '<head><meta name="dtb:uid" content="' + fb2Esc(uid) + '"/></head>' +
+            '<docTitle><text>' + fb2Esc(fb.title) + '</text></docTitle>' +
+            '<navMap>' + navMap.join('') + '</navMap></ncx>'),
+    })
+    return makeStoreZip(files)
+}
+
 window.reader = {
     async open(url) {
         try {
@@ -136,6 +386,7 @@ window.reader = {
                             if (!candidates.includes(c)) candidates.push(c)
                         }
                         let best = null
+                        let bestDoc = null
                         for (const enc of candidates) {
                             try {
                                 const text = new TextDecoder(enc).decode(bytes).replace(/^\uFEFF/, '')
@@ -143,18 +394,32 @@ window.reader = {
                                 if (!doc.querySelector('parsererror') &&
                                     doc.documentElement && doc.documentElement.localName.toLowerCase() === 'fictionbook') {
                                     best = text
+                                    bestDoc = doc
                                     console.info('[fb2] decode ok via ' + enc)
                                     break
                                 }
                             } catch (e) { console.warn('[fb2] decode fail ' + enc + ': ' + e) }
                         }
-                        if (best) {
-                            // declaration → utf-8: foliate перекодирует повторно по ней
-                            best = best.replace(/^(\s*<\?xml\s+version\s*=\s*["']1\.\d+["']\s+encoding\s*=\s*)["'][^"']+["']/i, '$1"utf-8"')
-                            input = new File([new TextEncoder().encode(best)], 'book.fb2', { type: 'application/x-fictionbook+xml' })
-                        } else {
+                        if (!best || !bestDoc) {
                             console.error('[fb2] ни одна кодировка не дала валидный XML')
-                            bridge && bridge.onError('FB2: не удалось определить кодировку файла')
+                            bridge && bridge.onError('FB2: файл не распознан как валидный FictionBook XML')
+                            return 'error'
+                        }
+                        // Своя конвертация fb2 → EPUB: fb2.js foliate обходим целиком
+                        // (там бывали и пустые книги, и зависания — белый экран).
+                        try {
+                            const fb = fb2ToChapters(bestDoc)
+                            if (!fb || !fb.chapters.length || fb.chapters.every(c => !c.trim())) {
+                                bridge && bridge.onError('FB2: в файле нет тела книги (body/section)')
+                                return 'error'
+                            }
+                            const epub = fb2ToEpub(fb)
+                            console.info('[fb2] epub built: chapters=' + fb.chapters.length +
+                                ', bytes=' + epub.length)
+                            input = new File([epub], 'book.epub', { type: 'application/epub+zip' })
+                        } catch (e) {
+                            console.error('[fb2] convert failed:', e)
+                            bridge && bridge.onError('FB2: ошибка конвертации — ' + e)
                             return 'error'
                         }
                     }
@@ -168,6 +433,11 @@ window.reader = {
             await Promise.race([view.open(input), timeout])
             const book = view.book
             if (!book) throw new Error('Книга не открылась (view.book пуст)')
+            if (book.sections && book.sections.length === 0) {
+                throw new Error('Книга открылась без содержимого (0 секций)')
+            }
+            console.info('[books] opened: sections=' +
+                (book.sections ? book.sections.length : '?') + ', toc=' + (book.toc ? book.toc.length : 'null'))
             applyStyle()
             if (book.toc) {
                 const flat = []

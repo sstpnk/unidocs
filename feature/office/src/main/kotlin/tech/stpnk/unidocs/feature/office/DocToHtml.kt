@@ -333,7 +333,7 @@ object DocToHtml {
                 // DIFAT: 109 записей в заголовке + цепочка (0x44 = кол-во, 0x48 — первый сектор)
                 val fatIds = mutableListOf<Int>()
                 for (i in 0 until 109) fatIds.add(bytes.i32(0x4C + 4 * i))
-                var difatCur = bytes.i32(0x48)
+                var difatCur = if (difatCount > 109) bytes.i32(0x48) else END_OF_CHAIN
                 var difatGuard = 0
                 while (difatCur in 0..0xFFFFFFFA && difatCur != END_OF_CHAIN && difatGuard <= difatCount + 8) {
                     val sec = sectorOf(difatCur)
